@@ -6,6 +6,8 @@
   const marked = $('marked');
   let last = null;
   let revealed = false;
+  let current = -1;
+  const history = [];
 
   const SAMPLE = `La inteligencia artificial en la universidad
 
@@ -162,7 +164,87 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
       .forEach((x) => ul.append(li(x.label, (x.weight > 0 ? '+' : '') + x.weight.toFixed(1), x.detail, x.weight < 0)));
     last.docReasons.forEach((d) => ul.append(li(d.label + ' (todo el texto)', '+' + d.weight.toFixed(1))));
     if (!ul.children.length) ul.append(li('Sin rasgos especiales en esta frase; pesa el contexto', ''));
+    renderFix(s);
+    current = i;
+    $('delta').hidden = true;
     if (window.matchMedia('(max-width: 860px)').matches) $('detail').scrollIntoView({ block: 'nearest' });
+  }
+
+  // Guided rewriting: tips for the selected sentence and a box to rewrite it. Nothing is rewritten automatically.
+  function renderFix(s) {
+    const ul = $('tips');
+    ul.textContent = '';
+    const tips = window.PolidetectorTips.suggest(s);
+    tips.forEach((t) => {
+      const el = document.createElement('li');
+      const b = document.createElement('strong');
+      b.textContent = t.label;
+      const p = document.createElement('span');
+      p.textContent = t.tip;
+      el.append(b, p);
+      if (t.alts.length) {
+        const alts = document.createElement('ul');
+        alts.className = 'alts';
+        t.alts.forEach((a) => {
+          const x = document.createElement('li');
+          const term = document.createElement('code');
+          term.textContent = a.term;
+          x.append(term, ' → ' + a.alts.join(', '));
+          alts.append(x);
+        });
+        el.append(alts);
+      }
+      ul.append(el);
+    });
+    if (!tips.length) {
+      const el = document.createElement('li');
+      el.textContent = s.ai ? 'No hay un rasgo concreto que cambiar; la marcan las frases de alrededor.' : 'Esta frase no tiene rasgos de IA que corregir.';
+      ul.append(el);
+    }
+    $('rewrite').value = s.text;
+    $('next').hidden = !last.sentences.some((o, j) => o.ai && j !== last.sentences.indexOf(s));
+  }
+
+  function applyRewrite() {
+    const s = last.sentences[current];
+    const next = $('rewrite').value.trim();
+    if (!s || !next || next === s.text) return;
+    const before = { p: s.p, ai: s.ai, count: last.aiSentences, total: last.evaluatedSentences };
+    history.push(input.value);
+    input.value = last.text.slice(0, s.start) + next + last.text.slice(s.end);
+    updateCount();
+    last = window.Polidetector.analyze(input.value);
+    render();
+    $('undo').hidden = false;
+    // The rewrite may have split or merged sentences: select the first one that starts where the old one did.
+    const j = last.sentences.findIndex((o) => !o.excluded && o.end > s.start);
+    if (j < 0) return;
+    showDetail(j);
+    const now = last.sentences[j];
+    const fmt = (p, ai) => p.toFixed(2).replace('.', ',') + (ai ? ' (IA)' : ' (humana)');
+    $('delta').textContent = `Puntuación de la frase: ${fmt(before.p, before.ai)} → ${fmt(now.p, now.ai)}. Frases como IA en el texto: ${before.count} de ${before.total} → ${last.aiSentences} de ${last.evaluatedSentences}.`;
+    $('delta').hidden = false;
+  }
+
+  function nextFlagged() {
+    const n = last.sentences.length;
+    for (let k = 1; k <= n; k++) {
+      const j = (current + k) % n;
+      if (last.sentences[j].ai) {
+        showDetail(j);
+        marked.querySelector(`[data-i="${j}"]`).scrollIntoView({ block: 'center', behavior: 'smooth' });
+        return;
+      }
+    }
+  }
+
+  function undo() {
+    if (!history.length) return;
+    input.value = history.pop();
+    updateCount();
+    last = window.Polidetector.analyze(input.value);
+    render();
+    $('undo').hidden = !history.length;
   }
 
   function render() {
@@ -173,6 +255,8 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
   function run() {
     if (!words(input.value)) return;
     revealed = false;
+    history.length = 0;
+    $('undo').hidden = true;
     last = window.Polidetector.analyze(input.value);
     render();
     // Replay the stamp landing on every new analysis (not on "Ver las frases igualmente").
@@ -208,6 +292,10 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
   $('edit').addEventListener('click', edit);
   $('clear').addEventListener('click', clear);
   $('reveal').addEventListener('click', () => { revealed = true; render(); });
+  $('apply').addEventListener('click', applyRewrite);
+  $('next').addEventListener('click', nextFlagged);
+  $('undo').addEventListener('click', undo);
+  $('rewrite').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) applyRewrite(); });
   $('sample').addEventListener('click', () => { input.value = SAMPLE; updateCount(); run(); });
   input.addEventListener('input', updateCount);
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) run(); });

@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=8">
+<link rel="stylesheet" href="styles.css?v=9">
 </head>
 <body>
 <header class="top">
@@ -29,6 +29,7 @@
     <div class="toolbar">
       <button id="analyze" class="btn primary" type="button">Analizar</button>
       <button id="edit" class="btn" type="button" hidden>Editar texto</button>
+      <button id="undo" class="btn" type="button" hidden>Deshacer cambio</button>
       <button id="clear" class="btn" type="button">Borrar texto</button>
       <button id="sample" class="btn ghost" type="button">Probar con un ejemplo</button>
       <span id="count" class="count">0 palabras</span>
@@ -67,8 +68,19 @@
         <h2 class="h">Frase seleccionada</h2>
         <p id="detailP" class="detail-p"></p>
         <ul id="detailList" class="signals"></ul>
+        <div id="fix">
+          <h2 class="h">Cómo reescribirla</h2>
+          <ul id="tips" class="tips"></ul>
+          <label for="rewrite" class="fix-label">Tu versión de la frase</label>
+          <textarea id="rewrite" class="rewrite" rows="4" spellcheck="true"></textarea>
+          <div class="fix-actions">
+            <button id="apply" class="btn small primary" type="button">Aplicar y volver a analizar</button>
+            <button id="next" class="btn small" type="button">Siguiente frase marcada</button>
+          </div>
+          <p id="delta" class="delta" hidden></p>
+        </div>
       </div>
-      <p class="hint" id="hint">Toca cualquier frase del texto para ver por qué se ha clasificado así.</p>
+      <p class="hint" id="hint">Toca cualquier frase del texto para ver por qué se ha clasificado así y cómo reescribirla.</p>
     </div>
 
     <details class="about">
@@ -80,6 +92,7 @@
         <li>El porcentaje es la proporción de frases evaluadas que salen como IA, no del texto entero.</li>
         <li>Hacen falta al menos 300 palabras de prosa y como mucho 30.000.</li>
         <li>Entre el 1 % y el 19 % se muestra «*%», sin cifra ni subrayados, porque ahí los falsos positivos son más probables.</li>
+        <li>Al tocar una frase marcada verás consejos para reescribirla y alternativas a las expresiones típicas de IA. Polidetector no reescribe por ti: tú cambias la frase y se vuelve a analizar. Que baje aquí el porcentaje no garantiza que baje en Turnitin.</li>
         <li>Las primeras y últimas frases necesitan una puntuación más alta, porque las introducciones y conclusiones genéricas dan más falsos positivos. En textos de menos de 10 frases no se aplica, porque casi todas serían de principio o final.</li>
       </ul>
       <p>Lo que no se puede copiar es el modelo de Turnitin, que es privado. Aquí la puntuación de cada frase sale de rasgos de estilo: a favor de IA, frases hechas, palabras comodín y frases de longitud muy regular; a favor de humano, tono coloquial, primera persona, frases largas con muchas comas, nombres y cifras exactas y erratas de tecleo. Antes de analizar se quitan los caracteres invisibles y las letras de otros alfabetos camufladas, un truco habitual para engañar a los detectores.</p>
@@ -89,6 +102,7 @@
 </main>
 
 <script src="detector.js?v=11"></script>
-<script src="app.js?v=9"></script>
+<script src="sugerencias.js?v=1"></script>
+<script src="app.js?v=10"></script>
 </body>
 </html>
