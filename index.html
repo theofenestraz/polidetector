@@ -42,14 +42,14 @@
       <dl class="legend">
         <div><dt><span class="swatch ai"></span></dt><dd>Frase clasificada como IA</dd></div>
         <div><dt><span class="swatch human"></span></dt><dd>Frase clasificada como humana</dd></div>
-        <div><dt><span class="swatch excl"></span></dt><dd>No evaluada (listas, títulos, referencias, tablas, código)</dd></div>
+        <div><dt><span class="swatch excl"></span></dt><dd>No evaluada (listas, títulos, referencias, tablas, código, diálogos)</dd></div>
       </dl>
     </div>
 
     <div id="result" hidden>
       <div class="stamp" id="stamp">
         <p class="score"><span id="pct">0</span><span class="unit" id="unit">%</span></p>
-        <p class="score-label" id="scoreLabel">de la prosa evaluada parece IA</p>
+        <p class="score-label" id="scoreLabel">de la prosa evaluada tiene rasgos de IA</p>
       </div>
       <div class="bar" role="img" id="bar">
         <span class="seg ai" id="segAI"></span><span class="seg human" id="segHuman"></span>
@@ -75,19 +75,20 @@
       <summary>¿Qué criterios sigue y cuánto fiarse?</summary>
       <p>Polidetector aplica las reglas que Turnitin publica en su centro de ayuda sobre su detector de IA:</p>
       <ul>
-        <li>Solo evalúa frases de prosa. Las listas, títulos, referencias, tablas, fórmulas y código se quitan y no cuentan en el porcentaje.</li>
+        <li>Solo evalúa frases de prosa. Las listas, títulos, referencias, tablas, fórmulas y código se quitan y no cuentan en el porcentaje. Polidetector quita además las líneas de diálogo, porque con sus reglas no se puede distinguir un diálogo humano de uno escrito por IA.</li>
         <li>Cada frase recibe una puntuación entre 0 y 1 teniendo en cuenta las frases de alrededor. Si supera el umbral es IA y si no, humana.</li>
         <li>El porcentaje es la proporción de frases evaluadas que salen como IA, no del texto entero.</li>
         <li>Hacen falta al menos 300 palabras de prosa y como mucho 30.000.</li>
         <li>Entre el 1 % y el 19 % se muestra «*%», sin cifra ni subrayados, porque ahí los falsos positivos son más probables.</li>
-        <li>Las primeras y últimas frases necesitan una puntuación más alta, porque las introducciones y conclusiones genéricas dan más falsos positivos.</li>
+        <li>Las primeras y últimas frases necesitan una puntuación más alta, porque las introducciones y conclusiones genéricas dan más falsos positivos. En textos de menos de 10 frases no se aplica, porque casi todas serían de principio o final.</li>
       </ul>
-      <p>Lo que no se puede copiar es el modelo de Turnitin, que es privado. Aquí la puntuación de cada frase sale de rasgos de estilo (frases hechas, palabras comodín, rayas, enumeraciones de tres, frases de longitud muy regular, tono coloquial…). El resultado es orientativo y puede no coincidir con el que te daría Turnitin. Polidetector no es un producto de Turnitin ni está relacionado con él. Tu texto no sale del navegador.</p>
+      <p>Lo que no se puede copiar es el modelo de Turnitin, que es privado. Aquí la puntuación de cada frase sale de rasgos de estilo: a favor de IA, frases hechas, palabras comodín y frases de longitud muy regular; a favor de humano, tono coloquial, primera persona, frases largas con muchas comas, nombres y cifras exactas y erratas de tecleo. Antes de analizar se quitan los caracteres invisibles y las letras de otros alfabetos camufladas, un truco habitual para engañar a los detectores.</p>
+      <p>Ningún detector es infalible, tampoco los comerciales: la IA bien escrita o retocada puede pasar como humana, y algunos textos humanos muy formales pueden parecer IA. Toma el resultado como un indicio, nunca como una prueba, y puede no coincidir con el que te daría Turnitin. Polidetector no es un producto de Turnitin ni está relacionado con él. Tu texto no sale del navegador.</p>
     </details>
   </aside>
 </main>
 
-<script src="detector.js?v=9"></script>
-<script src="app.js?v=8"></script>
+<script src="detector.js?v=11"></script>
+<script src="app.js?v=9"></script>
 </body>
 </html>

@@ -126,6 +126,9 @@
   const CITATION = /(?:\(\d{4}[a-z]?\)|\b(?:19|20)\d{2}\)?\.\s|doi:|https?:\/\/|www\.|et al\.)/iu;
 
   function exclusion(line, s, words) {
+    // Spanish dialogue opens with an em dash. Style rules cannot tell human from AI dialogue, so it is
+    // left out instead of being counted as human.
+    if (/^\s*—/u.test(line)) return 'diálogo';
     if (/^\s*(?:[-*•·▪◦–—]\s|\d+[.)]\s|[a-z][.)]\s)/iu.test(line)) return 'lista';
     if (/^\s*#{1,6}\s/u.test(line)) return 'título';
     if (/\t|\|/.test(line) || / {3,}\S/.test(line.trim())) return 'tabla';
@@ -148,6 +151,7 @@
     // Turnitin reports more false positives in generic intro/conclusion sentences and raised the bar there.
     edgeThreshold: 0.7,
     edge: 2,
+    edgeMinSentences: 10,
     ownWeight: 0.55,
     context: 3,
     paraUniform: 0.3,
@@ -172,13 +176,41 @@
     veryLong: -0.6,
     longWords: 40,
     commaDense: -0.8,
-    specific: -0.8,
+    commaRate: 0.12,
+    listItemWords: 0,
+    specificNames: 3,
+    specificYears: false,
+    specific: -0.5,
     imperfect: -0.8,
   };
 
+  // Evasion tricks that break word matching without changing how the text looks (RAID and SilverSpeak
+  // report homoglyph attacks sending detectors to chance): invisible characters, decomposed accents, and
+  // Cyrillic or Greek look-alikes inside otherwise Latin words. Real Greek or Cyrillic words are left alone.
+  const INVISIBLE = /[\u00AD\u200B-\u200F\u2060-\u2064\uFEFF]/g;
+  const LOOKALIKE = {
+    'а': 'a', 'е': 'e', 'о': 'o', 'р': 'p', 'с': 'c', 'у': 'y', 'х': 'x', 'і': 'i', 'ј': 'j', 'ѕ': 's', 'ԁ': 'd', 'һ': 'h',
+    'А': 'A', 'В': 'B', 'Е': 'E', 'К': 'K', 'М': 'M', 'Н': 'H', 'О': 'O', 'Р': 'P', 'С': 'C', 'Т': 'T', 'Х': 'X', 'І': 'I', 'Ј': 'J', 'Ѕ': 'S',
+    'ο': 'o', 'α': 'a', 'ν': 'v', 'ι': 'i', 'κ': 'k', 'ρ': 'p', 'τ': 't', 'υ': 'u',
+    'Α': 'A', 'Β': 'B', 'Ε': 'E', 'Ζ': 'Z', 'Η': 'H', 'Ι': 'I', 'Κ': 'K', 'Μ': 'M', 'Ν': 'N', 'Ο': 'O', 'Ρ': 'P', 'Τ': 'T', 'Υ': 'Y', 'Χ': 'X',
+  };
+  const LOOKALIKE_RE = new RegExp('[' + Object.keys(LOOKALIKE).join('') + ']', 'g');
+
+  function clean(text) {
+    const invisible = (text.match(INVISIBLE) || []).length;
+    let out = text.replace(INVISIBLE, '').normalize('NFC');
+    let lookalikes = 0;
+    out = out.replace(/\p{L}+/gu, (w) => {
+      if (!/\p{Script=Latin}/u.test(w) || !/[\p{Script=Cyrillic}\p{Script=Greek}]/u.test(w)) return w;
+      return w.replace(LOOKALIKE_RE, (c) => { lookalikes++; return LOOKALIKE[c]; });
+    });
+    return { text: out, invisible, lookalikes };
+  }
+
   function analyze(text, opts) {
     const C = Object.assign({}, DEFAULTS, opts);
-    text = text || '';
+    const cleaned = clean(text || '');
+    text = cleaned.text;
     const sentences = segment(text);
     const totalWords = (text.match(WORD) || []).length;
 
@@ -262,11 +294,14 @@
       if (words < 6) add('Frase muy corta', C.veryShort);
       if (words > C.longWords) add('Frase muy larga y enredada', C.veryLong);
       // Students and journalists chain clauses with commas; LLM prose keeps about one comma per clause.
-      const commas = (t.match(/,/g) || []).length;
-      if (C.commaDense && words >= 10 && commas / words >= 0.12) add('Muchas comas encadenadas', C.commaDense);
-      // Concrete names and figures: capitalised words mid-sentence or numbers with 3+ digits.
+      // Commas that separate short list items ("clases, herencia, constructores") do not count.
+      const commas = t.split(',').slice(1).filter((seg) => (seg.match(WORD) || []).length > C.listItemWords).length;
+      if (C.commaDense && words >= 10 && commas / words >= C.commaRate) add('Muchas comas encadenadas', C.commaDense);
+      // Concrete names and figures: capitalised words mid-sentence, or exact figures (decimals, thousands,
+      // percentages). Bare years are left out because LLM histories are full of them.
       const names = (t.slice(1).match(/(?<![.!?:«“"]\s)(?<=\s)\p{Lu}\p{Ll}+/gu) || []).length;
-      if (C.specific && (names >= 2 || /\d[\d.,]{2,}/.test(t))) add('Nombres o cifras concretas', C.specific);
+      const figures = C.specificYears ? /\d[\d.,]{2,}/ : /\d[.,]\d|\d\s?%/;
+      if (C.specific && (names >= C.specificNames || figures.test(t))) add('Nombres o cifras concretas', C.specific);
       // Typing slips LLMs never make: double spaces, a doubled word, a space before punctuation.
       const gap = text.slice(Math.max(0, s.start - 3), s.start);
       if (C.imperfect && (/ {2}/.test(gap) || /\S {2,}\S/.test(t) || /(?<![\p{L}])(\p{L}+) \1(?![\p{L}])/iu.test(t) || / [,.;:]/.test(t))) {
@@ -283,7 +318,8 @@
       const ctx = mean(win.map((o) => o.x));
       s.p = sigmoid(C.ownWeight * s.x + (1 - C.ownWeight) * ctx);
       s.own = sigmoid(s.x);
-      s.edge = i < C.edge || i >= prose.length - C.edge;
+      // In short texts nearly every sentence is an edge one, so the stricter bar only applies to longer texts.
+      s.edge = prose.length >= C.edgeMinSentences && (i < C.edge || i >= prose.length - C.edge);
       s.threshold = s.edge ? C.edgeThreshold : C.threshold;
       s.ai = s.p >= s.threshold;
       if (s.ai) s.reasons.filter((r) => r.weight > 0).forEach((r) => tally(r.label));
@@ -301,6 +337,8 @@
     sentences.filter((s) => s.excluded).forEach((s) => { excludedBy[s.excluded] = (excludedBy[s.excluded] || 0) + 1; });
 
     return {
+      text,
+      tampering: { invisible: cleaned.invisible, lookalikes: cleaned.lookalikes },
       sentences,
       status,
       percentAI: raw,

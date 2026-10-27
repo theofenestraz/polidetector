@@ -32,7 +32,7 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
     $('clear').disabled = n === 0;
   };
 
-  const EXCL = { lista: 'lista', 'título': 'título', referencias: 'línea de referencias', tabla: 'tabla', 'fórmula o código': 'fórmula o código', fragmento: 'fragmento suelto' };
+  const EXCL = { lista: 'lista', 'título': 'título', referencias: 'línea de referencias', tabla: 'tabla', 'fórmula o código': 'fórmula o código', fragmento: 'fragmento suelto', 'diálogo': 'línea de diálogo' };
 
   // Rebuild the original text with each sentence wrapped and, when shown, its flagged terms underlined.
   function renderMarked(text, res, showMarks) {
@@ -93,9 +93,11 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
     const excludedTotal = Object.values(r.excludedBy).reduce((a, b) => a + b, 0);
     let meta = `Frases evaluadas: ${r.evaluatedSentences}, de las que ${plural(r.aiSentences, 'sale', 'salen')} como IA. Palabras de prosa: ${r.proseWords}.`;
     if (excludedTotal) {
-      const many = { lista: 'líneas de lista', 'título': 'títulos', referencias: 'líneas de referencias', tabla: 'líneas de tabla', 'fórmula o código': 'líneas de fórmula o código', fragmento: 'fragmentos sueltos' };
+      const many = { lista: 'líneas de lista', 'título': 'títulos', referencias: 'líneas de referencias', tabla: 'líneas de tabla', 'fórmula o código': 'líneas de fórmula o código', fragmento: 'fragmentos sueltos', 'diálogo': 'líneas de diálogo' };
       meta += ' No evaluadas: ' + Object.entries(r.excludedBy).map(([k, n]) => (n === 1 ? `1 ${EXCL[k]}` : `${n} ${many[k]}`)).join(', ') + '.';
     }
+    const tricks = r.tampering.invisible + r.tampering.lookalikes;
+    if (tricks) meta += ` Se han encontrado ${plural(tricks, 'carácter camuflado', 'caracteres camuflados')} (invisibles o letras de otros alfabetos que imitan a las latinas), un truco habitual para engañar a los detectores. Se han corregido antes de analizar.`;
     $('meta').textContent = meta;
 
     const pct = $('pct');
@@ -116,10 +118,10 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
       verdict = 'En este rango Turnitin no muestra cifra ni subraya frases, porque los falsos positivos son más probables.';
     } else {
       pct.textContent = r.percentAI; unit.textContent = '%';
-      label.textContent = 'de la prosa evaluada parece IA';
-      verdict = r.percentAI === 0 ? 'Ninguna frase supera el umbral. El texto se clasifica como humano.'
-        : r.percentAI >= 70 ? 'La mayor parte de la prosa se clasifica como IA.'
-        : 'Una parte de la prosa se clasifica como IA. Revisa las frases marcadas en rojo.';
+      label.textContent = 'de la prosa evaluada tiene rasgos de IA';
+      verdict = r.percentAI === 0 ? 'Ninguna frase supera el umbral, así que no hay indicios de IA. Eso no demuestra que sea humano: un texto de IA sin muletillas o retocado a mano puede pasar desapercibido.'
+        : r.percentAI >= 70 ? 'La mayor parte de la prosa tiene rasgos de IA. Es un indicio, no una prueba.'
+        : 'Una parte de la prosa tiene rasgos de IA. Revisa las frases marcadas en rojo. Es un indicio, no una prueba.';
     }
     $('verdict').textContent = verdict;
     const stamp = $('stamp');
@@ -164,7 +166,7 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
   }
 
   function render() {
-    renderMarked(input.value, last, last.status === 'ok' || revealed);
+    renderMarked(last.text, last, last.status === 'ok' || revealed);
     renderPanel(last);
   }
 
