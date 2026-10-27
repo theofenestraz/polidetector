@@ -239,6 +239,7 @@ textarea::placeholder { color: var(--pencil); }
 .hint { color: var(--pencil); font-size: .88rem; margin: 18px 0 0; }
 
 /* Guided rewriting */
+.btn.humanize { display: block; width: 100%; margin-top: 18px; }
 .tips { list-style: none; margin: 0; padding: 0; font-size: .94rem; }
 .tips > li { padding: 8px 0; border-bottom: 1px solid var(--rule); }
 .tips strong { display: block; font-weight: 700; font-stretch: 87%; }

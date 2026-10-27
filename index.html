@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=9">
+<link rel="stylesheet" href="styles.css?v=10">
 </head>
 <body>
 <header class="top">
@@ -58,6 +58,7 @@
       <p id="meta" class="meta"></p>
       <p id="verdict" class="verdict"></p>
       <button id="reveal" class="btn small" type="button" hidden>Ver las frases igualmente</button>
+      <button id="humanize" class="btn primary humanize" type="button" hidden>Humanizar frases marcadas</button>
 
       <div id="signalsBox">
         <h2 class="h">Lo que más pesa en las frases marcadas</h2>
@@ -69,7 +70,7 @@
         <p id="detailP" class="detail-p"></p>
         <ul id="detailList" class="signals"></ul>
         <div id="fix">
-          <h2 class="h">Cómo reescribirla</h2>
+          <h2 class="h">Humanizar esta frase</h2>
           <ul id="tips" class="tips"></ul>
           <label for="rewrite" class="fix-label">Tu versión de la frase</label>
           <textarea id="rewrite" class="rewrite" rows="4" spellcheck="true"></textarea>
@@ -103,6 +104,6 @@
 
 <script src="detector.js?v=11"></script>
 <script src="sugerencias.js?v=1"></script>
-<script src="app.js?v=10"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>

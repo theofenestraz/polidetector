@@ -136,6 +136,7 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
     $('bar').hidden = r.status !== 'ok' && !revealed;
 
     $('reveal').hidden = r.status === 'ok' || revealed || !r.evaluatedSentences;
+    $('humanize').hidden = !r.aiSentences;
     $('signalsBox').hidden = !marksShown;
     $('hint').hidden = !marksShown;
     if (revealed && r.status !== 'ok') {
@@ -292,6 +293,13 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
   $('edit').addEventListener('click', edit);
   $('clear').addEventListener('click', clear);
   $('reveal').addEventListener('click', () => { revealed = true; render(); });
+  // Entry point to the guided mode: show the marks if Turnitin's rules would hide them, then open the first flagged sentence.
+  $('humanize').addEventListener('click', () => {
+    if (last.status !== 'ok' && !revealed) { revealed = true; render(); }
+    current = -1;
+    nextFlagged();
+    $('rewrite').focus({ preventScroll: true });
+  });
   $('apply').addEventListener('click', applyRewrite);
   $('next').addEventListener('click', nextFlagged);
   $('undo').addEventListener('click', undo);
