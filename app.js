@@ -233,7 +233,9 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
       const j = (current + k) % n;
       if (last.sentences[j].ai) {
         showDetail(j);
-        marked.querySelector(`[data-i="${j}"]`).scrollIntoView({ block: 'center', behavior: 'smooth' });
+        // Jump to the tips and rewrite box, not to the sentence: the detail already quotes it, and on a
+        // phone the text sits above the panel, so scrolling there hid everything the button had just opened.
+        $('detail').scrollIntoView({ block: 'start', behavior: 'smooth' });
         return;
       }
     }
@@ -298,7 +300,8 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
     if (last.status !== 'ok' && !revealed) { revealed = true; render(); }
     current = -1;
     nextFlagged();
-    $('rewrite').focus({ preventScroll: true });
+    // On a phone focusing would pop the keyboard over the tips.
+    if (!window.matchMedia('(max-width: 860px)').matches) $('rewrite').focus({ preventScroll: true });
   });
   $('apply').addEventListener('click', applyRewrite);
   $('next').addEventListener('click', nextFlagged);
