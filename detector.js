@@ -23,6 +23,12 @@
     'ofrece una visión', 'abre la puerta a', 'marca un antes y un después', 'no solo', 'sino también',
     'espero que esto te ayude', 'espero que te sea útil', 'aquí tienes', 'por supuesto,', 'claro que sí',
     'teniendo en cuenta', 'de cara al futuro', 'un mundo cada vez más', 'cada vez más importante',
+    'pieza clave', 'resulta clave', 'resultan fundamentales', 'resultan esenciales', 'apuesta por', 'coinciden en que',
+    'en este contexto', 'ponen de manifiesto', 'todo ello',
+    // es, storytelling
+    'sin pensarlo dos veces', 'latió con fuerza', 'latía con fuerza', 'lágrimas en los ojos', 'desde aquel día',
+    'desde ese día', 'a partir de aquel día', 'aprendió que', 'comprendió que', 'con pasos firmes', 'un tesoro',
+    'en un instante', 'un susurro',
     // en
     "it's important to note", 'it is important to note', 'it is worth noting', "it's worth noting", 'it is essential to',
     'in conclusion', 'in summary', 'to sum up', "in today's", 'fast-paced', 'ever-evolving', 'ever-changing',
@@ -130,14 +136,48 @@
     return null;
   }
 
-  const MIN_WORDS = 300;
-  const MAX_WORDS = 30000;
-  const THRESHOLD = 0.6;
-  // Turnitin reports more false positives in generic intro/conclusion sentences and raised the bar there.
-  const EDGE_THRESHOLD = 0.75;
-  const EDGE = 2;
+  // Every weight and threshold lives here so calibrar.html can tune them against a labelled corpus.
+  // Values from the 2026-10-27 calibration (12 AI texts, 6 human): spanish dashes, openers and triads
+  // turned out to be as common in human prose, so they barely count; human texts stand out by long,
+  // comma-heavy sentences, concrete names and figures, and typing slips.
+  const DEFAULTS = {
+    minWords: 300,
+    maxWords: 30000,
+    base: -0.2,
+    threshold: 0.6,
+    // Turnitin reports more false positives in generic intro/conclusion sentences and raised the bar there.
+    edgeThreshold: 0.7,
+    edge: 2,
+    ownWeight: 0.55,
+    context: 3,
+    paraUniform: 0.3,
+    phrase: 1.1,
+    buzz: 0.55,
+    dash: 0.2,
+    opener: 0.2,
+    triad: 0.2,
+    notXbutY: 0.9,
+    bold: 0.6,
+    burstFlat: 0.6,
+    burstRegular: 0.25,
+    burstVaried: -0.5,
+    typicalLength: 0.35,
+    longVocab: 0.35,
+    informal: -1.4,
+    filler: -0.45,
+    expressive: -0.6,
+    lowercase: -0.6,
+    firstPerson: -0.5,
+    veryShort: -0.4,
+    veryLong: -0.6,
+    longWords: 40,
+    commaDense: -0.8,
+    specific: -0.8,
+    imperfect: -0.8,
+  };
 
-  function analyze(text) {
+  function analyze(text, opts) {
+    const C = Object.assign({}, DEFAULTS, opts);
     text = text || '';
     const sentences = segment(text);
     const totalWords = (text.match(WORD) || []).length;
@@ -170,9 +210,9 @@
       const win = lens.slice(Math.max(0, i - 2), i + 3);
       if (win.length < 4) return null;
       const cv = stdev(win) / mean(win);
-      if (cv < 0.25) return { label: 'Frases vecinas de longitud casi idéntica', weight: 0.6 };
-      if (cv < 0.4) return { label: 'Frases vecinas de longitud regular', weight: 0.25 };
-      if (cv > 0.7) return { label: 'Frases vecinas de longitud muy variada', weight: -0.5 };
+      if (cv < 0.25) return { label: 'Frases vecinas de longitud casi idéntica', weight: C.burstFlat };
+      if (cv < 0.4) return { label: 'Frases vecinas de longitud regular', weight: C.burstRegular };
+      if (cv > 0.7) return { label: 'Frases vecinas de longitud muy variada', weight: C.burstVaried };
       return null;
     });
     const docReasons = [];
@@ -181,7 +221,7 @@
     prose.forEach((s) => { paraWords[s.para] = (paraWords[s.para] || 0) + s.words; });
     const paras = Object.values(paraWords).filter((n) => n > 15);
     if (paras.length >= 3 && stdev(paras) / mean(paras) < 0.2) {
-      docBias += 0.3; docReasons.push({ label: 'Párrafos de tamaño casi idéntico', weight: 0.3 });
+      docBias += C.paraUniform; docReasons.push({ label: 'Párrafos de tamaño casi idéntico', weight: C.paraUniform });
     }
 
     const signals = {};
@@ -192,35 +232,46 @@
       const words = s.words;
       const reasons = [];
       const hits = [];
-      let x = -1.3 + docBias;
+      let x = C.base + docBias;
       const add = (label, w, detail) => { x += w; reasons.push({ label, weight: w, detail }); };
 
       const phrases = collect(PHRASES, t, 'phrase', hits);
-      if (phrases.length) add('Frases hechas típicas de IA', Math.min(phrases.length, 3) * 1.1, phrases.join(', '));
+      if (phrases.length) add('Frases hechas típicas de IA', Math.min(phrases.length, 3) * C.phrase, phrases.join(', '));
       const buzz = collect(BUZZ, t, 'buzz', hits).filter((b) => !phrases.some((p) => p.toLowerCase().includes(b.toLowerCase())));
-      if (buzz.length) add('Palabras comodín', Math.min(buzz.length, 3) * 0.55, buzz.join(', '));
+      if (buzz.length) add('Palabras comodín', Math.min(buzz.length, 3) * C.buzz, buzz.join(', '));
       const dashes = collect(DASH, t, 'dash', hits);
-      if (dashes.length) add('Rayas (—) como pausa', Math.min(dashes.length, 2) * 0.8);
-      if (OPENERS.test(t)) add('Empieza con conector formal', 0.6, t.match(OPENERS)[0]);
-      if (TRIAD.test(t)) add('Enumeración de tres elementos', 0.5, t.match(TRIAD)[0]);
-      if (NOT_X_BUT_Y.test(t)) add('Estructura «no es X, sino Y»', 0.9);
-      if (/\*\*[^*]+\*\*/.test(t)) add('Negritas dentro del texto', 0.6);
+      if (dashes.length) add('Rayas (—) como pausa', Math.min(dashes.length, 2) * C.dash);
+      if (OPENERS.test(t)) add('Empieza con conector formal', C.opener, t.match(OPENERS)[0]);
+      if (TRIAD.test(t)) add('Enumeración de tres elementos', C.triad, t.match(TRIAD)[0]);
+      if (NOT_X_BUT_Y.test(t)) add('Estructura «no es X, sino Y»', C.notXbutY);
+      if (/\*\*[^*]+\*\*/.test(t)) add('Negritas dentro del texto', C.bold);
       if (burst[i]) add(burst[i].label, burst[i].weight);
-      if (words >= 14 && words <= 32) add('Longitud de frase típica de IA', 0.35);
+      if (words >= 14 && words <= 32) add('Longitud de frase típica de IA', C.typicalLength);
       const letters = (t.match(/\p{L}/gu) || []).length;
-      if (words >= 6 && letters / words > 5.6) add('Vocabulario largo y formal', 0.35);
+      if (words >= 6 && letters / words > 5.6) add('Vocabulario largo y formal', C.longVocab);
 
       const informal = collect(INFORMAL_STRONG, t, 'human', hits).concat(collect(LAUGH, t, 'human', hits));
-      if (informal.length) add('Tono coloquial', -1.4 * Math.min(informal.length, 2), informal.join(', '));
+      if (informal.length) add('Tono coloquial', C.informal * Math.min(informal.length, 2), informal.join(', '));
       const weak = collect(INFORMAL_WEAK, t, 'human', hits);
-      if (weak.length) add('Muletillas de conversación', -0.45 * Math.min(weak.length, 2), weak.join(', '));
-      if (/[!?]{2,}|\.{3}|…/.test(t)) add('Puntuación expresiva (!!, ...)', -0.6);
-      if (/^[\p{Ll}]/u.test(t)) add('Empieza en minúscula', -0.6);
+      if (weak.length) add('Muletillas de conversación', C.filler * Math.min(weak.length, 2), weak.join(', '));
+      if (/[!?]{2,}|\.{3}|…/.test(t)) add('Puntuación expresiva (!!, ...)', C.expressive);
+      if (/^[\p{Ll}]/u.test(t)) add('Empieza en minúscula', C.lowercase);
       FIRST_PERSON.lastIndex = 0;
-      if (FIRST_PERSON.test(t)) add('Habla en primera persona', -0.5);
+      if (FIRST_PERSON.test(t)) add('Habla en primera persona', C.firstPerson);
       FIRST_PERSON.lastIndex = 0;
-      if (words < 6) add('Frase muy corta', -0.4);
-      if (words > 45) add('Frase muy larga y enredada', -0.3);
+      if (words < 6) add('Frase muy corta', C.veryShort);
+      if (words > C.longWords) add('Frase muy larga y enredada', C.veryLong);
+      // Students and journalists chain clauses with commas; LLM prose keeps about one comma per clause.
+      const commas = (t.match(/,/g) || []).length;
+      if (C.commaDense && words >= 10 && commas / words >= 0.12) add('Muchas comas encadenadas', C.commaDense);
+      // Concrete names and figures: capitalised words mid-sentence or numbers with 3+ digits.
+      const names = (t.slice(1).match(/(?<![.!?:«“"]\s)(?<=\s)\p{Lu}\p{Ll}+/gu) || []).length;
+      if (C.specific && (names >= 2 || /\d[\d.,]{2,}/.test(t))) add('Nombres o cifras concretas', C.specific);
+      // Typing slips LLMs never make: double spaces, a doubled word, a space before punctuation.
+      const gap = text.slice(Math.max(0, s.start - 3), s.start);
+      if (C.imperfect && (/ {2}/.test(gap) || /\S {2,}\S/.test(t) || /(?<![\p{L}])(\p{L}+) \1(?![\p{L}])/iu.test(t) || / [,.;:]/.test(t))) {
+        add('Erratas de tecleo', C.imperfect);
+      }
 
       Object.assign(s, { x, reasons, hits });
     });
@@ -228,12 +279,12 @@
     // Turnitin scores each sentence "in context with the surrounding text" using overlapping
     // segments of a few sentences, so blend each sentence with its neighbours in the same paragraph.
     prose.forEach((s, i) => {
-      const win = prose.slice(Math.max(0, i - 3), i + 4).filter((o) => o.para === s.para);
+      const win = prose.slice(Math.max(0, i - C.context), i + C.context + 1).filter((o) => o.para === s.para);
       const ctx = mean(win.map((o) => o.x));
-      s.p = sigmoid(0.55 * s.x + 0.45 * ctx);
+      s.p = sigmoid(C.ownWeight * s.x + (1 - C.ownWeight) * ctx);
       s.own = sigmoid(s.x);
-      s.edge = i < EDGE || i >= prose.length - EDGE;
-      s.threshold = s.edge ? EDGE_THRESHOLD : THRESHOLD;
+      s.edge = i < C.edge || i >= prose.length - C.edge;
+      s.threshold = s.edge ? C.edgeThreshold : C.threshold;
       s.ai = s.p >= s.threshold;
       if (s.ai) s.reasons.filter((r) => r.weight > 0).forEach((r) => tally(r.label));
     });
@@ -242,8 +293,8 @@
     const aiCount = prose.filter((s) => s.ai).length;
     const raw = prose.length ? Math.round((aiCount / prose.length) * 100) : 0;
     let status = 'ok';
-    if (proseWords < MIN_WORDS) status = 'short';
-    else if (proseWords > MAX_WORDS) status = 'long';
+    if (proseWords < C.minWords) status = 'short';
+    else if (proseWords > C.maxWords) status = 'long';
     else if (raw >= 1 && raw < 20) status = 'low';
 
     const excludedBy = {};
@@ -260,11 +311,11 @@
       excludedBy,
       signals,
       docReasons,
-      minWords: MIN_WORDS,
+      minWords: C.minWords,
     };
   }
 
-  const api = { analyze, segment };
+  const api = { analyze, segment, DEFAULTS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Polidetector = api;
 })(typeof window !== 'undefined' ? window : globalThis);
