@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=10">
+<link rel="stylesheet" href="styles.css?v=11">
 </head>
 <body>
 <header class="top">
@@ -72,6 +72,12 @@
         <div id="fix">
           <h2 class="h">Humanizar esta frase</h2>
           <ul id="tips" class="tips"></ul>
+          <div id="example" class="example" hidden>
+            <p class="fix-label">Ejemplo humanizado (borrador automático)</p>
+            <p id="exampleText" class="example-text"></p>
+            <p id="exampleNote" class="example-note"></p>
+            <button id="useExample" class="btn small" type="button">Copiar al cuadro</button>
+          </div>
           <label for="rewrite" class="fix-label">Tu versión de la frase</label>
           <textarea id="rewrite" class="rewrite" rows="4" spellcheck="true"></textarea>
           <div class="fix-actions">
@@ -93,7 +99,7 @@
         <li>El porcentaje es la proporción de frases evaluadas que salen como IA, no del texto entero.</li>
         <li>Hacen falta al menos 300 palabras de prosa y como mucho 30.000.</li>
         <li>Entre el 1 % y el 19 % se muestra «*%», sin cifra ni subrayados, porque ahí los falsos positivos son más probables.</li>
-        <li>Al tocar una frase marcada verás consejos para reescribirla y alternativas a las expresiones típicas de IA. Polidetector no reescribe por ti: tú cambias la frase y se vuelve a analizar. Que baje aquí el porcentaje no garantiza que baje en Turnitin.</li>
+        <li>Al tocar una frase marcada verás consejos para reescribirla, alternativas a las expresiones típicas de IA y un ejemplo reescrito con esas mismas reglas. El ejemplo es un borrador: las reglas no entienden el sentido de la frase, así que revísalo antes de usarlo. Que baje aquí la puntuación no garantiza que baje en Turnitin ni en otros detectores.</li>
         <li>Las primeras y últimas frases necesitan una puntuación más alta, porque las introducciones y conclusiones genéricas dan más falsos positivos. En textos de menos de 10 frases no se aplica, porque casi todas serían de principio o final.</li>
       </ul>
       <p>Lo que no se puede copiar es el modelo de Turnitin, que es privado. Aquí la puntuación de cada frase sale de rasgos de estilo: a favor de IA, frases hechas, palabras comodín y frases de longitud muy regular; a favor de humano, tono coloquial, primera persona, frases largas con muchas comas, nombres y cifras exactas y erratas de tecleo. Antes de analizar se quitan los caracteres invisibles y las letras de otros alfabetos camufladas, un truco habitual para engañar a los detectores.</p>
@@ -103,7 +109,7 @@
 </main>
 
 <script src="detector.js?v=11"></script>
-<script src="sugerencias.js?v=1"></script>
-<script src="app.js?v=12"></script>
+<script src="sugerencias.js?v=2"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>

@@ -30,10 +30,10 @@
     'papel fundamental': ['mucho peso'], 'papel crucial': ['mucho peso'], 'papel clave': ['mucho peso'], 'papel esencial': ['mucho peso'],
     'sin lugar a dudas': ['', 'claramente'], 'sin duda alguna': [''], 'a lo largo de la historia': ['siempre', 'desde hace siglos'],
     'en este sentido': [''], 'dicho esto': ['', 'aun así'], 'en otras palabras': ['', 'o sea'],
-    'de manera significativa': ['bastante', 'mucho'], 'de forma significativa': ['bastante', 'mucho'],
+    'de manera significativa': ['', 'bastante'], 'de forma significativa': ['', 'bastante'],
     'de manera efectiva': ['bien'], 'de manera integral': ['entero', 'del todo'],
-    'una amplia gama': ['muchos', 'varios'], 'un amplio abanico': ['muchos', 'varios'], 'una gran variedad de': ['muchos', 'varios'],
-    'un sinfín de': ['muchos'], 'una miríada de': ['muchos'],
+    'una amplia gama': ['todo tipo'], 'un amplio abanico': ['todo tipo'], 'una gran variedad de': ['todo tipo de'],
+    'un sinfín de': ['mil'], 'una miríada de': ['mil'],
     'adentrarnos en': ['ver', 'meternos en'], 'sumergirnos en': ['ver'], 'profundizar en': ['ver más a fondo'],
     'en el ámbito de': ['en'], 'en el contexto de': ['en'], 'un aspecto clave': ['lo principal'],
     'es fundamental': ['hace falta', 'hay que'], 'es crucial': ['hace falta', 'hay que'], 'es esencial': ['hace falta', 'hay que'],
@@ -41,24 +41,25 @@
     'pone de manifiesto': ['muestra', 'deja ver'], 'ponen de manifiesto': ['muestran'], 'cobra especial relevancia': ['importa más'],
     'en constante evolución': ['que cambia mucho'], 'en continua evolución': ['que cambia mucho'],
     'abre la puerta a': ['permite'], 'marca un antes y un después': ['cambia mucho'],
-    'teniendo en cuenta': ['como', 'ya que'], 'de cara al futuro': ['más adelante'], 'un mundo cada vez más': ['un mundo más'],
+    'teniendo en cuenta': ['viendo'], 'de cara al futuro': ['más adelante'], 'un mundo cada vez más': ['un mundo más'],
     'cada vez más importante': ['más importante'], 'pieza clave': ['parte importante'], 'apuesta por': ['elige', 'prefiere'],
     'en este contexto': ['', 'aquí'], 'todo ello': ['esto'],
-    crucial: ['importante', 'clave'], cruciales: ['importantes'], fundamental: ['básico', 'importante'], fundamentales: ['básicos', 'importantes'],
-    esencial: ['necesario', 'básico'], esenciales: ['necesarios'], significativo: ['grande', 'notable'], significativa: ['grande'],
-    significativos: ['grandes'], significativas: ['grandes'], 'holístico': ['completo'], 'holística': ['completa'], integral: ['completo'],
+    // First alternative keeps gender and number, because the example generator always tries it first.
+    crucial: ['importante', 'clave'], cruciales: ['importantes'], fundamental: ['importante', 'clave'], fundamentales: ['importantes'],
+    esencial: ['clave', 'importante'], esenciales: ['importantes'], significativo: ['grande', 'claro'], significativa: ['grande', 'clara'],
+    significativos: ['grandes'], significativas: ['grandes'], 'holístico': ['completo'], 'holística': ['completa'], integral: ['global'],
     innovador: ['nuevo'], innovadora: ['nueva'], innovadores: ['nuevos'], transformador: ['que cambia mucho'],
-    fomentar: ['animar a', 'favorecer'], fomenta: ['favorece'], potenciar: ['mejorar', 'reforzar'], potencia: ['mejora', 'refuerza'],
+    fomentar: ['favorecer', 'animar a'], fomenta: ['favorece'], potenciar: ['mejorar', 'reforzar'], potencia: ['mejora', 'refuerza'],
     abordar: ['tratar', 'resolver'], aborda: ['trata'], optimizar: ['mejorar', 'agilizar'], impulsar: ['empujar', 'ayudar a'],
-    impulsa: ['empuja', 'ayuda a'], garantizar: ['asegurar'], panorama: ['situación'], 'ámbito': ['campo', 'terreno'],
+    impulsa: ['empuja', 'ayuda a'], garantizar: ['asegurar'], panorama: ['escenario'], 'ámbito': ['campo', 'terreno'],
     'ámbitos': ['campos', 'sectores'], sinergia: ['colaboración'], paradigma: ['modelo', 'forma de pensar'], 'intrínseco': ['propio'],
     'multifacético': ['variado'], 'multifacética': ['variada'], robusto: ['sólido', 'fiable'], robusta: ['sólida', 'fiable'],
     primordial: ['lo primero', 'principal'], enriquecedor: ['útil', 'que aporta'], enriquecedora: ['útil'], invaluable: ['muy útil'],
-    vibrante: ['animado', 'vivo'], apasionante: ['interesante'], fascinante: ['curioso', 'interesante'],
+    vibrante: ['con mucha vida'], apasionante: ['interesante'], fascinante: ['interesante', 'curioso'],
     meticuloso: ['cuidadoso'], meticulosa: ['cuidadosa'], exhaustivo: ['completo', 'a fondo'], exhaustiva: ['completa'],
-    notable: ['claro', 'grande'], notablemente: ['bastante', 'mucho'], indudablemente: ['', 'claramente'], asimismo: ['también', ''],
-    sostenible: ['que aguanta', 'que dura'], eficiente: ['que funciona bien', 'rápido'], 'dinámico': ['activo', 'que cambia'], 'dinámica': ['activa'],
-    'además': ['', 'y', 'también'], 'por otro lado': ['', 'pero'], 'por otra parte': ['', 'pero'], 'en primer lugar': ['', 'primero'],
+    notable: ['importante', 'claro'], notablemente: ['bastante', 'mucho'], indudablemente: ['', 'claramente'], asimismo: ['también', ''],
+    sostenible: ['que aguanta', 'que dura'], eficiente: ['que funciona bien', 'rápido'], 'dinámico': ['activo', 'que cambia'],
+    'además': ['', 'y', 'también'], 'sin embargo': ['pero'], 'por otro lado': ['', 'pero'], 'por otra parte': ['', 'pero'], 'en primer lugar': ['', 'primero'],
     'en segundo lugar': ['', 'luego'], 'en tercer lugar': ['', 'y'], finalmente: ['', 'al final'], 'por último': ['', 'y'],
     'no obstante': ['pero'], 'por lo tanto': ['así que'], 'de este modo': ['así'], 'de esta manera': ['así'],
     'así pues': ['así que'], 'por consiguiente': ['así que'],
@@ -110,5 +111,87 @@
     return tips;
   }
 
-  root.PolidetectorTips = { suggest, TIPS, ALTS };
+  // Example rewrite built from the same rules: try each edit in turn and keep it only when the detector
+  // scores the sentence lower. It cannot check grammar or meaning, so the UI shows it as a draft to revise.
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const termRe = (k) => new RegExp('(?<![\\p{L}\\p{N}])' + esc(k) + '(?![\\p{L}\\p{N}])', 'iu');
+  // Role phrases are rewritten whole, verb included; the bare keys would leave "influye fundamental".
+  const SKIP = /^(?:juega|desempeña|papel) /;
+  const ROLE = /(?<![\p{L}])(juega|juegan|desempeña|desempeñan|tiene|tienen|cumple|cumplen) un papel(?: (?:muy )?(?:fundamental|crucial|clave|esencial|importante|decisivo|central|relevante|vital|determinante))?(?![\p{L}])/iu;
+  const SPLITS = [
+    [', y ', '. Y '], [', pero ', '. Pero '], ['; ', '. '], [', aunque ', '. Aunque '], [', ya que ', '. Es que '],
+    [', lo que ', '. Eso '], [', porque ', '. Porque '], [', mientras que ', '. En cambio, '], [', por lo que ', '. Así que '],
+    [', which ', '. That '], [', but ', '. But '], [', and ', '. And '],
+  ];
+
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  function tidy(s) {
+    let t = s
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/\s+([,.;:])/g, '$1')
+      .replace(/,\s*,/g, ',')
+      .replace(/,\s*([.;:])/g, '$1')
+      .replace(/\s{2,}/g, ' ')
+      .replace(/^[\s,;:]+/, '')
+      .trim();
+    // Removing "Es importante destacar" or "cabe señalar" leaves a dangling "que".
+    t = t.replace(/^que\s+/i, '').replace(/([.;]\s+)que\s+/gi, '$1');
+    t = t.replace(/^(Pero|Y|Así que|Así|También|Al final|Hoy|Ahora|And|But|So),\s/, '$1 ');
+    t = t.replace(/([.!?]\s+)(\p{Ll})/gu, (m, a, b) => a + b.toUpperCase());
+    return cap(t);
+  }
+
+  function edits(text) {
+    const list = [];
+    const keys = Object.keys(ALTS).filter((k) => !SKIP.test(k)).sort((a, b) => b.length - a.length);
+    const m = text.match(ROLE);
+    if (m) {
+      const plural = /n$/i.test(m[1]);
+      (plural ? ['influyen mucho', 'pesan mucho'] : ['influye mucho', 'pesa mucho'])
+        .forEach((a) => list.push((t) => t.replace(ROLE, (hit) => (/^\p{Lu}/u.test(hit) ? cap(a) : a))));
+    }
+    keys.forEach((k) => {
+      const re = termRe(k);
+      if (!re.test(text)) return;
+      ALTS[k].forEach((a) => list.push((t) => t.replace(re, (hit) => (a && /^\p{Lu}/u.test(hit) ? cap(a) : a))));
+    });
+    list.push((t) => t.replace(/\s*[—–]\s*/g, ', '));
+    list.push((t) => t.replace(/no se trata (?:solo |solamente |únicamente )?de ([^,;.]+),\s?sino (?:de )?([^.;]+)/i, 'más que $1, es $2'));
+    list.push((t) => t.replace(/no es (?:solo |solamente )?([^,;.]+),\s?sino ([^.;]+)/i, 'es $2, más que $1'));
+    list.push((t) => t.replace(/no solo ([^,;.]+?),?\s+sino también ([^.;]+)/i, '$1 y también $2'));
+    // Split a long sentence at the joint closest to its middle; both halves need a few words.
+    list.push((t) => {
+      let best = null;
+      SPLITS.forEach(([from, to]) => {
+        let i = t.toLowerCase().indexOf(from);
+        while (i > 0) {
+          const a = t.slice(0, i).split(/\s+/).length;
+          const b = t.slice(i + from.length).split(/\s+/).length;
+          const off = Math.abs(a - b);
+          if (a >= 5 && b >= 5 && (!best || off < best.off)) best = { off, s: t.slice(0, i) + to + t.slice(i + from.length) };
+          i = t.toLowerCase().indexOf(from, i + 1);
+        }
+      });
+      return best ? best.s : t;
+    });
+    return list;
+  }
+
+  // score(candidate) returns { p, ai } for the candidate placed back in the text.
+  function humanize(text, score) {
+    let best = text;
+    let bestScore = score(text);
+    const start = bestScore;
+    for (let pass = 0; pass < 2; pass++) {
+      for (const edit of edits(best)) {
+        const c = tidy(edit(best));
+        if (!c || c === best || c.split(/\s+/).length < 3) continue;
+        const sc = score(c);
+        if (sc.p < bestScore.p - 0.005) { best = c; bestScore = sc; }
+      }
+    }
+    return { text: best, before: start, after: bestScore, changed: best !== text };
+  }
+
+  root.PolidetectorTips = { suggest, humanize, TIPS, ALTS };
 })(typeof window !== 'undefined' ? window : globalThis);

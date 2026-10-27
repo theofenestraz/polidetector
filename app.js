@@ -202,8 +202,32 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
       el.textContent = s.ai ? 'No hay un rasgo concreto que cambiar; la marcan las frases de alrededor.' : 'Esta frase no tiene rasgos de IA que corregir.';
       ul.append(el);
     }
+    renderExample(s, tips.length > 0);
     $('rewrite').value = s.text;
     $('next').hidden = !last.sentences.some((o, j) => o.ai && j !== last.sentences.indexOf(s));
+  }
+
+  // Rule-based example: each candidate is scored in place, with its real neighbours, like the rewrite box.
+  function renderExample(s, hasTips) {
+    const box = $('example');
+    box.hidden = !s.ai && !hasTips;
+    if (box.hidden) return;
+    const score = (cand) => {
+      const r = window.Polidetector.analyze(last.text.slice(0, s.start) + cand + last.text.slice(s.end));
+      const end = s.start + cand.length;
+      const hit = r.sentences.filter((o) => !o.excluded && o.end > s.start && o.start < end);
+      return hit.length ? { p: Math.max(...hit.map((o) => o.p)), ai: hit.some((o) => o.ai) } : { p: Infinity, ai: false };
+    };
+    const ex = window.PolidetectorTips.humanize(s.text, score);
+    const fmt = (p) => p.toFixed(2).replace('.', ',');
+    $('exampleText').textContent = ex.text;
+    $('useExample').hidden = !ex.changed;
+    if (!ex.changed) {
+      $('exampleText').textContent = 'No hay cambios automáticos que bajen la puntuación de esta frase. Sigue los consejos de arriba.';
+      $('exampleNote').textContent = '';
+    } else {
+      $('exampleNote').textContent = `Puntuación ${fmt(ex.before.p)} → ${fmt(ex.after.p)}, ${ex.after.ai ? 'sigue por encima del umbral (pesan las frases de alrededor o lo que las reglas no saben cambiar)' : 'ya por debajo del umbral'}. Hecho con reglas, no entiende el sentido: revisa que diga lo mismo y que concuerde. Bajar aquí no garantiza nada en Turnitin.`;
+    }
   }
 
   function applyRewrite() {
@@ -214,6 +238,8 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
     history.push(input.value);
     input.value = last.text.slice(0, s.start) + next + last.text.slice(s.end);
     updateCount();
+    // Rewrites usually shorten the text; if it drops under the word minimum, keep the marks visible anyway.
+    if (last.status === 'ok') revealed = true;
     last = window.Polidetector.analyze(input.value);
     render();
     $('undo').hidden = false;
@@ -304,6 +330,7 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
     if (!window.matchMedia('(max-width: 860px)').matches) $('rewrite').focus({ preventScroll: true });
   });
   $('apply').addEventListener('click', applyRewrite);
+  $('useExample').addEventListener('click', () => { $('rewrite').value = $('exampleText').textContent; $('rewrite').focus(); });
   $('next').addEventListener('click', nextFlagged);
   $('undo').addEventListener('click', undo);
   $('rewrite').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) applyRewrite(); });

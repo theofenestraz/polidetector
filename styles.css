@@ -262,6 +262,9 @@ textarea::placeholder { color: var(--pencil); }
   resize: vertical;
 }
 .rewrite:focus-visible { outline: 3px solid var(--focus); outline-offset: 0; }
+.example { margin-top: 4px; }
+.example-text { margin: 0; padding: 10px 12px; border: 2px dashed var(--ink); font-family: var(--type); font-size: .92rem; line-height: 1.5; }
+.example-note { margin: 6px 0 0; color: var(--pencil); font-size: .85rem; }
 .fix-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .fix-actions .btn.small { margin-top: 10px; }
 .delta { margin: 12px 0 0; padding: 8px 10px; border-left: 3px solid var(--ink); background: var(--paper); font-size: .9rem; }
