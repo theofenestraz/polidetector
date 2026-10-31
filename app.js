@@ -86,6 +86,8 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
 
   function plural(n, one, many) { return n === 1 ? '1 ' + one : n + ' ' + many; }
 
+  const BAND_NAMES = { fuerte: 'Indicio fuerte', dudoso: 'Dudoso', 'sin-conclusion': 'Sin conclusión' };
+
   function renderPanel(r) {
     $('empty').hidden = true;
     $('result').hidden = false;
@@ -117,17 +119,19 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
     } else if (r.status === 'low') {
       pct.textContent = '*'; unit.textContent = '%';
       label.textContent = 'IA detectada por debajo del 20 %';
-      verdict = 'En este rango Turnitin no muestra cifra ni subraya frases, porque los falsos positivos son más probables.';
+      verdict = 'Pocas frases superan el umbral, pero esto no demuestra que sea humano: también hay textos de IA en este rango. Turnitin no muestra cifra ni subraya frases aquí, porque los falsos positivos son más probables.';
     } else {
       pct.textContent = r.percentAI; unit.textContent = '%';
       label.textContent = 'de la prosa evaluada tiene rasgos de IA';
-      verdict = r.percentAI === 0 ? 'Ninguna frase supera el umbral, así que no hay indicios de IA. Eso no demuestra que sea humano: un texto de IA sin muletillas o retocado a mano puede pasar desapercibido.'
-        : r.percentAI >= 70 ? 'La mayor parte de la prosa tiene rasgos de IA. Es un indicio, no una prueba.'
-        : 'Una parte de la prosa tiene rasgos de IA. Revisa las frases marcadas en rojo. Es un indicio, no una prueba.';
+      verdict = r.band === 'fuerte' ? 'La mayor parte de la prosa tiene rasgos de IA. Es un indicio fuerte, no una prueba.'
+        : r.band === 'dudoso' ? 'Una parte de la prosa tiene rasgos de IA, pero este rango no permite decidir en ningún sentido. Revisa las frases marcadas en rojo. Es un indicio, no una prueba.'
+        : r.percentAI === 0 ? 'Ninguna frase supera el umbral. Eso no demuestra que sea humano: un texto de IA sin muletillas o retocado a mano puede pasar desapercibido.'
+        : 'Pocas frases superan el umbral, pero esto no demuestra que sea humano: también hay textos de IA en este rango.';
     }
     $('verdict').textContent = verdict;
+    $('bandName').textContent = BAND_NAMES[r.band] || 'Sin veredicto';
     const stamp = $('stamp');
-    stamp.dataset.state = r.status === 'short' || r.status === 'long' ? 'none' : r.status === 'ok' && r.percentAI === 0 ? 'clean' : 'ai';
+    stamp.dataset.state = r.band === 'fuerte' ? 'ai' : r.band === 'dudoso' ? 'doubt' : 'none';
 
     const shownPct = r.status === 'ok' || revealed ? r.percentAI : 0;
     $('segAI').style.width = shownPct + '%';

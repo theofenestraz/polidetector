@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=11">
+<link rel="stylesheet" href="styles.css?v=12">
 </head>
 <body>
 <header class="top">
@@ -49,6 +49,7 @@
 
     <div id="result" hidden>
       <div class="stamp" id="stamp">
+        <p class="band-name" id="bandName"></p>
         <p class="score"><span id="pct">0</span><span class="unit" id="unit">%</span></p>
         <p class="score-label" id="scoreLabel">de la prosa evaluada tiene rasgos de IA</p>
       </div>
@@ -99,6 +100,7 @@
         <li>El porcentaje es la proporción de frases evaluadas que salen como IA, no del texto entero.</li>
         <li>Hacen falta al menos 300 palabras de prosa y como mucho 30.000.</li>
         <li>Entre el 1 % y el 19 % se muestra «*%», sin cifra ni subrayados, porque ahí los falsos positivos son más probables.</li>
+        <li>El resultado se resume en tres bandas provisionales: sin conclusión (menos del 30 %), dudoso (del 30 % al 69 %) e indicio fuerte (70 % o más). Estas bandas no son de Turnitin. Un resultado bajo no demuestra que el texto sea humano.</li>
         <li>Al tocar una frase marcada verás consejos para reescribirla, alternativas a las expresiones típicas de IA y un ejemplo reescrito con esas mismas reglas. El ejemplo es un borrador: las reglas no entienden el sentido de la frase, así que revísalo antes de usarlo. Que baje aquí la puntuación no garantiza que baje en Turnitin ni en otros detectores.</li>
         <li>Las primeras y últimas frases necesitan una puntuación más alta, porque las introducciones y conclusiones genéricas dan más falsos positivos. En textos de menos de 10 frases no se aplica, porque casi todas serían de principio o final.</li>
       </ul>
@@ -108,8 +110,8 @@
   </aside>
 </main>
 
-<script src="detector.js?v=11"></script>
+<script src="detector.js?v=12"></script>
 <script src="sugerencias.js?v=2"></script>
-<script src="app.js?v=13"></script>
+<script src="app.js?v=14"></script>
 </body>
 </html>

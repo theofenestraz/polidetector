@@ -187,7 +187,7 @@ textarea::placeholder { color: var(--pencil); }
   transform: rotate(-4deg);
   transform-origin: 30% 60%;
 }
-.stamp[data-state="clean"] { --c: var(--ink); }
+.stamp[data-state="doubt"] { --c: var(--ink); border-style: dashed; }
 .stamp[data-state="none"] { --c: var(--pencil); }
 .stamp.land { animation: stamp .42s cubic-bezier(.3, 1.4, .5, 1) both; }
 @keyframes stamp {
@@ -195,11 +195,19 @@ textarea::placeholder { color: var(--pencil); }
   60% { opacity: 1; }
   100% { opacity: 1; transform: rotate(-4deg) scale(1); }
 }
+.band-name {
+  margin: 0 0 8px;
+  font-weight: 900;
+  font-stretch: 100%;
+  font-size: clamp(1.7rem, 4vw, 2.2rem);
+  line-height: 1;
+  text-transform: uppercase;
+}
 .score {
   margin: 0;
   font-weight: 900;
   font-stretch: 112%;
-  font-size: clamp(4rem, 9vw, 5.6rem);
+  font-size: clamp(2.2rem, 5vw, 3rem);
   line-height: .9;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;

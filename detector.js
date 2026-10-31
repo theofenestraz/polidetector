@@ -148,6 +148,10 @@
     maxWords: 30000,
     base: -0.2,
     threshold: 0.6,
+    // Provisional band cuts over the % of AI sentences, from the calibration corpus. Below bandDudoso nothing can be
+    // concluded, because AI texts land there too, so a low score never counts as proof of human writing.
+    bandDudoso: 30,
+    bandFuerte: 70,
     // Turnitin reports more false positives in generic intro/conclusion sentences and raised the bar there.
     edgeThreshold: 0.7,
     edge: 2,
@@ -332,6 +336,8 @@
     if (proseWords < C.minWords) status = 'short';
     else if (proseWords > C.maxWords) status = 'long';
     else if (raw >= 1 && raw < 20) status = 'low';
+    let band = null;
+    if (status === 'ok' || status === 'low') band = raw >= C.bandFuerte ? 'fuerte' : raw >= C.bandDudoso ? 'dudoso' : 'sin-conclusion';
 
     const excludedBy = {};
     sentences.filter((s) => s.excluded).forEach((s) => { excludedBy[s.excluded] = (excludedBy[s.excluded] || 0) + 1; });
@@ -341,6 +347,7 @@
       tampering: { invisible: cleaned.invisible, lookalikes: cleaned.lookalikes },
       sentences,
       status,
+      band,
       percentAI: raw,
       aiSentences: aiCount,
       evaluatedSentences: prose.length,
