@@ -140,51 +140,50 @@
   }
 
   // Every weight and threshold lives here so calibrar.html can tune them against a labelled corpus.
-  // Values from the 2026-10-27 calibration (12 AI texts, 6 human): spanish dashes, openers and triads
-  // turned out to be as common in human prose, so they barely count; human texts stand out by long,
-  // comma-heavy sentences, concrete names and figures, and typing slips.
+  // Values from the 2026-11-02 calibration (639 dated human and AI texts, calibracion/ajustar.sh): openers and
+  // triads do not separate the classes; human texts stand out by very long sentences and concrete names and figures.
   const DEFAULTS = {
     minWords: 300,
     maxWords: 30000,
-    base: -0.2,
+    base: -0.4,
     threshold: 0.6,
     // Provisional band cuts over the % of AI sentences, from the calibration corpus. Below bandDudoso nothing can be
     // concluded, because AI texts land there too, so a low score never counts as proof of human writing.
-    bandDudoso: 30,
-    bandFuerte: 70,
+    bandDudoso: 40,
+    bandFuerte: 60,
     // Turnitin reports more false positives in generic intro/conclusion sentences and raised the bar there.
     edgeThreshold: 0.7,
     edge: 2,
     edgeMinSentences: 10,
-    ownWeight: 0.55,
+    ownWeight: 0.7,
     context: 3,
     paraUniform: 0.3,
-    phrase: 1.1,
-    buzz: 0.55,
-    dash: 0.2,
-    opener: 0.2,
-    triad: 0.2,
-    notXbutY: 0.9,
+    phrase: 0.8,
+    buzz: 0.3,
+    dash: -0.3,
+    opener: 0,
+    triad: 0,
+    notXbutY: 1.4,
     bold: 0.6,
-    burstFlat: 0.6,
+    burstFlat: 1,
     burstRegular: 0.25,
     burstVaried: -0.5,
-    typicalLength: 0.35,
-    longVocab: 0.35,
+    typicalLength: 0.7,
+    longVocab: 0,
     informal: -1.4,
     filler: -0.45,
     expressive: -0.6,
     lowercase: -0.6,
-    firstPerson: -0.5,
+    firstPerson: -0.2,
     veryShort: -0.4,
-    veryLong: -0.6,
+    veryLong: -1,
     longWords: 40,
     commaDense: -0.8,
     commaRate: 0.12,
     listItemWords: 0,
     specificNames: 3,
     specificYears: false,
-    specific: -0.5,
+    specific: -1.2,
     imperfect: -0.8,
   };
 
