@@ -8,6 +8,10 @@
   let revealed = false;
   let current = -1;
   const history = [];
+  let proposal = null;
+  let boxSpan = null;
+  let fresh = [];
+  let busy = false;
 
   const SAMPLE = `La inteligencia artificial en la universidad
 
@@ -52,6 +56,7 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
         span.className = 's ' + (showMarks ? (s.ai ? 'ai' : 'human') : 'plain');
         span.tabIndex = 0;
         span.title = 'Puntuación ' + s.p.toFixed(2);
+        if (fresh.some((c) => s.start >= c.start && s.start < c.end)) { span.classList.add('new'); span.title += '. Reescrita por «Humanizar todo»'; }
         const ranges = showMarks ? s.hits.filter((h) => h.kind !== 'human').sort((a, b) => a.from - b.from) : [];
         let p = 0;
         for (const r of ranges) {
@@ -140,7 +145,7 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
     $('bar').hidden = r.status !== 'ok' && !revealed;
 
     $('reveal').hidden = r.status === 'ok' || revealed || !r.evaluatedSentences;
-    $('humanize').hidden = !r.aiSentences;
+    $('humanizeBox').hidden = !r.aiSentences;
     $('signalsBox').hidden = !marksShown;
     $('hint').hidden = !marksShown;
     if (revealed && r.status !== 'ok') {
@@ -179,7 +184,7 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
   function renderFix(s) {
     const ul = $('tips');
     ul.textContent = '';
-    const tips = window.PolidetectorTips.suggest(s);
+    const tips = window.PolidetectorTips.suggest(s, last);
     tips.forEach((t) => {
       const el = document.createElement('li');
       const b = document.createElement('strong');
@@ -206,55 +211,147 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
       el.textContent = s.ai ? 'No hay un rasgo concreto que cambiar; la marcan las frases de alrededor.' : 'Esta frase no tiene rasgos de IA que corregir.';
       ul.append(el);
     }
-    renderExample(s, tips.length > 0);
+    renderExample(s);
     $('rewrite').value = s.text;
+    boxSpan = null;
     $('next').hidden = !last.sentences.some((o, j) => o.ai && j !== last.sentences.indexOf(s));
   }
 
-  // Rule-based example: each candidate is scored in place, with its real neighbours, like the rewrite box.
-  function renderExample(s, hasTips) {
+  const fmt2 = (p) => p.toFixed(2).replace('.', ',');
+  // What the percentage reads as on screen: Turnitin-style rules hide the figure between 1 % and 19 %.
+  const shownPct = (pct) => (pct === 0 ? '0 %' : pct < 20 ? 'menos del 20 %' : pct + ' %');
+
+  // Rule-based example for a flagged sentence. It is searched against the whole text, so a proposal never raises the
+  // share of flagged sentences. When nothing works the box says so and the tips above stay as the way forward.
+  function renderExample(s) {
     const box = $('example');
-    box.hidden = !s.ai && !hasTips;
+    proposal = null;
+    box.hidden = !s.ai;
     if (box.hidden) return;
-    const score = (cand) => {
-      const r = window.Polidetector.analyze(last.text.slice(0, s.start) + cand + last.text.slice(s.end));
-      const end = s.start + cand.length;
-      const hit = r.sentences.filter((o) => !o.excluded && o.end > s.start && o.start < end);
-      return hit.length ? { p: Math.max(...hit.map((o) => o.p)), ai: hit.some((o) => o.ai) } : { p: Infinity, ai: false };
-    };
-    const ex = window.PolidetectorTips.humanize(s.text, score);
-    const fmt = (p) => p.toFixed(2).replace('.', ',');
-    $('exampleText').textContent = ex.text;
+    const ex = window.PolidetectorTips.propose(last.text, last, s);
+    $('applyExample').hidden = !ex.changed;
     $('useExample').hidden = !ex.changed;
     if (!ex.changed) {
-      $('exampleText').textContent = 'No hay cambios automáticos que bajen la puntuación de esta frase. Sigue los consejos de arriba.';
+      $('exampleText').textContent = 'No he encontrado un cambio automático que baje la puntuación de esta frase sin empeorar el resto del texto. Sigue los consejos de arriba: el cuadro de abajo ya tiene la frase para que la reescribas.';
       $('exampleNote').textContent = '';
-    } else {
-      $('exampleNote').textContent = `Puntuación ${fmt(ex.before.p)} → ${fmt(ex.after.p)}, ${ex.after.ai ? 'sigue por encima del umbral (pesan las frases de alrededor o lo que las reglas no saben cambiar)' : 'ya por debajo del umbral'}. Hecho con reglas, no entiende el sentido: revisa que diga lo mismo y que concuerde. Bajar aquí no garantiza nada en Turnitin.`;
+      return;
     }
+    proposal = ex;
+    $('exampleText').textContent = ex.text;
+    const join = ex.merged ? `Une esta frase con ${ex.start < s.start ? 'la anterior' : 'la siguiente'}, que también está marcada. ` : '';
+    const level = ex.after.ai ? 'sigue por encima del umbral (pesan las frases de alrededor o lo que las reglas no saben cambiar)' : 'ya por debajo del umbral';
+    $('exampleNote').textContent = `${join}Puntuación ${fmt2(s.p)} → ${fmt2(ex.after.p)}, ${level}. IA en el texto: ${shownPct(ex.before.pct)} → ${shownPct(ex.after.pct)}. Hecho con reglas, no entiende el sentido: revisa que diga lo mismo y que concuerde. Bajar aquí no garantiza nada en Turnitin.`;
   }
 
-  function applyRewrite() {
-    const s = last.sentences[current];
-    const next = $('rewrite').value.trim();
-    if (!s || !next || next === s.text) return;
-    const before = { p: s.p, ai: s.ai, count: last.aiSentences, total: last.evaluatedSentences };
+  const say = (msg, warn) => { const d = $('delta'); d.textContent = msg; d.dataset.warn = warn ? '1' : ''; d.hidden = false; };
+
+  // Puts `next` where text[start, end) was and reads the text again. `s` is the sentence the change started from.
+  function applyChange(s, start, end, next) {
+    const before = { p: s.p, ai: s.ai, count: last.aiSentences, total: last.evaluatedSentences, pct: last.percentAI, status: last.status };
     history.push(input.value);
-    input.value = last.text.slice(0, s.start) + next + last.text.slice(s.end);
+    input.value = last.text.slice(0, start) + next + last.text.slice(end);
     updateCount();
     // Rewrites usually shorten the text; if it drops under the word minimum, keep the marks visible anyway.
     if (last.status === 'ok') revealed = true;
     last = window.Polidetector.analyze(input.value);
+    resetBulk();
     render();
     $('undo').hidden = false;
     // The rewrite may have split or merged sentences: select the first one that starts where the old one did.
-    const j = last.sentences.findIndex((o) => !o.excluded && o.end > s.start);
+    const j = last.sentences.findIndex((o) => !o.excluded && o.end > start);
     if (j < 0) return;
     showDetail(j);
     const now = last.sentences[j];
-    const fmt = (p, ai) => p.toFixed(2).replace('.', ',') + (ai ? ' (IA)' : ' (humana)');
-    $('delta').textContent = `Puntuación de la frase: ${fmt(before.p, before.ai)} → ${fmt(now.p, now.ai)}. Frases como IA en el texto: ${before.count} de ${before.total} → ${last.aiSentences} de ${last.evaluatedSentences}.`;
-    $('delta').hidden = false;
+    const fmt = (p, ai) => fmt2(p) + (ai ? ' (IA)' : ' (humana)');
+    const rose = before.status !== 'short' && last.status !== 'short' && last.percentAI > before.pct;
+    say(`Puntuación de la frase: ${fmt(before.p, before.ai)} → ${fmt(now.p, now.ai)}. Frases como IA en el texto: ${before.count} de ${before.total} → ${last.aiSentences} de ${last.evaluatedSentences}. IA en el texto: ${shownPct(before.pct)} → ${shownPct(last.percentAI)}.${rose ? ' Ojo: con este cambio el porcentaje ha subido. Puedes volver atrás con «Deshacer cambio».' : ''}`, rose);
+  }
+
+  function applyRewrite() {
+    const s = last.sentences[current];
+    if (!s) { say('Toca primero una frase marcada del texto.', true); return; }
+    const span = boxSpan || { start: s.start, end: s.end };
+    const next = $('rewrite').value.trim();
+    if (!next) { say('El cuadro está vacío. Escribe la nueva versión de la frase.', true); return; }
+    if (next === last.text.slice(span.start, span.end)) { say('La frase del cuadro es igual que la del texto. Cambia algo o usa el ejemplo.', true); return; }
+    applyChange(s, span.start, span.end, next);
+  }
+
+  // One click: the example replaces the sentence (or the pair it joins) without going through the box.
+  function applyExample() {
+    const s = last.sentences[current];
+    if (!s || !proposal) return;
+    applyChange(s, proposal.start, proposal.end, proposal.text);
+  }
+
+  function copyExample() {
+    if (!proposal) return;
+    $('rewrite').value = proposal.text;
+    boxSpan = { start: proposal.start, end: proposal.end };
+    say('Copiado al cuadro. Edítalo si quieres y pulsa «Aplicar y volver a analizar».');
+    $('rewrite').focus();
+  }
+
+  function resetBulk() {
+    fresh = [];
+    $('bulk').hidden = true;
+  }
+
+  // "Humanizar todo": rewrites only the flagged sentences, in one go, and can be undone like any other change.
+  async function humanizeAll() {
+    if (!last || busy) return;
+    const snapshot = last;
+    busy = true;
+    ['humanizeAll', 'humanize', 'apply', 'applyExample', 'useExample', 'undo'].forEach((id) => { $(id).disabled = true; });
+    $('bulk').hidden = false;
+    $('bulkSummary').hidden = true;
+    $('bulkList').hidden = true;
+    $('bulkLeft').hidden = true;
+    $('bulkProgress').hidden = false;
+    $('bulkProgress').textContent = 'Preparando…';
+    try {
+      const res = await window.PolidetectorTips.humanizeAll(snapshot.text, (i, n) => { $('bulkProgress').textContent = `Humanizando la frase ${i + 1} de ${n}…`; });
+      if (last !== snapshot) return;
+      $('bulkProgress').hidden = true;
+      if (!res.changes.length) {
+        $('bulkSummary').hidden = false;
+        $('bulkSummary').textContent = 'No he podido reescribir ninguna frase marcada sin empeorar el resto del texto. Prueba «Humanizar frase por frase»: ahí tienes consejos con cifras para cada una.';
+        return;
+      }
+      history.push(input.value);
+      input.value = res.text;
+      updateCount();
+      if (snapshot.status === 'ok') revealed = true;
+      last = window.Polidetector.analyze(input.value);
+      fresh = res.changes;
+      $('bulk').hidden = false;
+      render();
+      $('undo').hidden = false;
+      const joined = res.changes.filter((c) => c.merged).length;
+      $('bulkSummary').hidden = false;
+      $('bulkSummary').textContent = `He reescrito ${plural(res.changes.length, 'frase', 'frases')} de las ${res.flagged} marcadas${joined ? ` (${plural(joined, 'unión de dos frases', 'uniones de dos frases')})` : ''}. IA en el texto: ${shownPct(res.before.pct)} → ${shownPct(res.after.pct)}. Las demás frases no se han tocado. Están subrayadas en el texto y puedes volver atrás con «Deshacer cambio».${last.status === 'short' ? ` El texto se ha quedado por debajo de ${last.minWords} palabras de prosa, así que ya no se muestra el porcentaje.` : ''}`;
+      const items = $('bulkItems');
+      items.textContent = '';
+      res.changes.forEach((c) => {
+        const li2 = document.createElement('li');
+        const was = document.createElement('div');
+        was.className = 'was';
+        was.textContent = c.before;
+        const now = document.createElement('div');
+        now.className = 'now';
+        now.textContent = c.after;
+        li2.append(was, now);
+        items.append(li2);
+      });
+      $('bulkList').hidden = false;
+      if (res.after.ai) {
+        $('bulkLeft').hidden = false;
+        $('bulkLeft').textContent = `Siguen marcadas ${plural(res.after.ai, 'frase', 'frases')} que no se pueden cambiar solas sin empeorar el texto. Revísalas con «Humanizar frase por frase».`;
+      }
+    } finally {
+      busy = false;
+      ['humanizeAll', 'humanize', 'apply', 'applyExample', 'useExample', 'undo'].forEach((id) => { $(id).disabled = false; });
+    }
   }
 
   function nextFlagged() {
@@ -276,6 +373,7 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
     input.value = history.pop();
     updateCount();
     last = window.Polidetector.analyze(input.value);
+    resetBulk();
     render();
     $('undo').hidden = !history.length;
   }
@@ -289,6 +387,8 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
     if (!words(input.value)) return;
     revealed = false;
     history.length = 0;
+    current = -1;
+    resetBulk();
     $('undo').hidden = true;
     last = window.Polidetector.analyze(input.value);
     render();
@@ -314,6 +414,8 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
   function clear() {
     input.value = '';
     last = null;
+    current = -1;
+    resetBulk();
     marked.textContent = '';
     $('result').hidden = true;
     $('empty').hidden = false;
@@ -334,7 +436,9 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
     if (!window.matchMedia('(max-width: 860px)').matches) $('rewrite').focus({ preventScroll: true });
   });
   $('apply').addEventListener('click', applyRewrite);
-  $('useExample').addEventListener('click', () => { $('rewrite').value = $('exampleText').textContent; $('rewrite').focus(); });
+  $('useExample').addEventListener('click', copyExample);
+  $('applyExample').addEventListener('click', applyExample);
+  $('humanizeAll').addEventListener('click', humanizeAll);
   $('next').addEventListener('click', nextFlagged);
   $('undo').addEventListener('click', undo);
   $('rewrite').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) applyRewrite(); });

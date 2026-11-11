@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=12">
+<link rel="stylesheet" href="styles.css?v=13">
 </head>
 <body>
 <header class="top">
@@ -59,7 +59,20 @@
       <p id="meta" class="meta"></p>
       <p id="verdict" class="verdict"></p>
       <button id="reveal" class="btn small" type="button" hidden>Ver las frases igualmente</button>
-      <button id="humanize" class="btn primary humanize" type="button" hidden>Humanizar frases marcadas</button>
+      <div id="humanizeBox" class="humanize-box" hidden>
+        <button id="humanizeAll" class="btn primary humanize" type="button">Humanizar todo</button>
+        <button id="humanize" class="btn humanize" type="button">Humanizar frase por frase</button>
+        <p class="hint">«Humanizar todo» reescribe solo las frases marcadas y puedes deshacerlo con un clic. «Frase por frase» te deja decidir cada cambio.</p>
+      </div>
+      <div id="bulk" class="bulk" aria-live="polite" hidden>
+        <p id="bulkProgress" class="meta"></p>
+        <p id="bulkSummary" class="bulk-summary" hidden></p>
+        <details id="bulkList" class="bulk-list" hidden>
+          <summary>Ver las frases cambiadas</summary>
+          <ol id="bulkItems"></ol>
+        </details>
+        <p id="bulkLeft" class="meta" hidden></p>
+      </div>
 
       <div id="signalsBox">
         <h2 class="h">Lo que más pesa en las frases marcadas</h2>
@@ -77,7 +90,10 @@
             <p class="fix-label">Ejemplo humanizado (borrador automático)</p>
             <p id="exampleText" class="example-text"></p>
             <p id="exampleNote" class="example-note"></p>
-            <button id="useExample" class="btn small" type="button">Copiar al cuadro</button>
+            <div class="fix-actions">
+              <button id="applyExample" class="btn small primary" type="button">Usar este ejemplo</button>
+              <button id="useExample" class="btn small" type="button">Copiar al cuadro</button>
+            </div>
           </div>
           <label for="rewrite" class="fix-label">Tu versión de la frase</label>
           <textarea id="rewrite" class="rewrite" rows="4" spellcheck="true"></textarea>
@@ -102,6 +118,8 @@
         <li>Entre el 1 % y el 19 % se muestra «*%», sin cifra ni subrayados, porque ahí los falsos positivos son más probables.</li>
         <li>El resultado se resume en tres bandas provisionales: sin conclusión (menos del 40 %), dudoso (del 40 % al 59 %) e indicio fuerte (60 % o más). Estas bandas no son de Turnitin. Un resultado bajo no demuestra que el texto sea humano.</li>
         <li>Al tocar una frase marcada verás consejos para reescribirla, alternativas a las expresiones típicas de IA y un ejemplo reescrito con esas mismas reglas. El ejemplo es un borrador: las reglas no entienden el sentido de la frase, así que revísalo antes de usarlo. Que baje aquí la puntuación no garantiza que baje en Turnitin ni en otros detectores.</li>
+        <li>«Humanizar todo» aplica ese mismo ejemplo a cada frase marcada, y solo a esas: quita muletillas y adverbios, parte frases largas o une dos marcadas. Solo se queda con un cambio si no sube el porcentaje de IA del texto. Siempre puedes volver atrás con «Deshacer cambio».</li>
+        <li>Al pegar desde Word, Google Docs o un PDF se limpian las sangrías, los espacios y saltos de línea raros y las líneas cortadas por el ancho de página, para que no se tomen por tablas ni se dejen sin evaluar.</li>
         <li>Las primeras y últimas frases necesitan una puntuación más alta, porque las introducciones y conclusiones genéricas dan más falsos positivos. En textos de menos de 10 frases no se aplica, porque casi todas serían de principio o final.</li>
       </ul>
       <p>Lo que no se puede copiar es el modelo de Turnitin, que es privado. Aquí la puntuación de cada frase sale de rasgos de estilo: a favor de IA, frases hechas, palabras comodín y frases de longitud muy regular; a favor de humano, tono coloquial, primera persona, frases largas con muchas comas, nombres y cifras exactas y erratas de tecleo. Antes de analizar se quitan los caracteres invisibles y las letras de otros alfabetos camufladas, un truco habitual para engañar a los detectores.</p>
@@ -110,8 +128,8 @@
   </aside>
 </main>
 
-<script src="detector.js?v=13"></script>
-<script src="sugerencias.js?v=2"></script>
-<script src="app.js?v=14"></script>
+<script src="detector.js?v=14"></script>
+<script src="sugerencias.js?v=5"></script>
+<script src="app.js?v=17"></script>
 </body>
 </html>

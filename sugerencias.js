@@ -18,7 +18,7 @@
   };
 
   // Plain alternatives for common flagged terms. An empty string means "just remove it".
-  const ALTS = {
+  const ALTS_ES = {
     'es importante destacar': ['', 'ojo:'], 'es importante señalar': [''], 'es importante tener en cuenta': ['', 'hay que contar con'],
     'es importante mencionar': [''], 'cabe destacar': [''], 'cabe señalar': [''], 'cabe mencionar': [''], 'cabe resaltar': [''],
     'vale la pena mencionar': [''], 'vale la pena destacar': [''],
@@ -63,7 +63,8 @@
     'en segundo lugar': ['', 'luego'], 'en tercer lugar': ['', 'y'], finalmente: ['', 'al final'], 'por último': ['', 'y'],
     'no obstante': ['pero'], 'por lo tanto': ['así que'], 'de este modo': ['así'], 'de esta manera': ['así'],
     'así pues': ['así que'], 'por consiguiente': ['así que'],
-    // en
+  };
+  const ALTS_EN = {
     "it's important to note": [''], 'it is important to note': [''], 'it is worth noting': [''], "it's worth noting": [''],
     'in conclusion': ['', 'so'], 'in summary': ['', 'so'], 'to sum up': [''], 'plays a crucial role': ['matters a lot'],
     'plays a vital role': ['matters a lot'], 'plays a key role': ['matters a lot'], 'plays a pivotal role': ['matters a lot'],
@@ -78,6 +79,16 @@
     innovative: ['new'], paramount: ['most important'], notably: ['especially'], profound: ['deep'], moreover: ['also', ''],
     furthermore: ['also', ''], additionally: ['also', ''], ultimately: ['in the end'], utilize: ['use'], showcasing: ['showing'], boasts: ['has'],
   };
+  const ALTS = Object.assign({}, ALTS_ES, ALTS_EN);
+  const EN_WORDS = new Set(['the', 'of', 'and', 'to', 'is', 'that', 'it', 'for', 'was', 'with', 'as', 'are', 'this', 'which', 'their', 'they', 'by', 'from', 'have', 'has', 'be', 'on', 'can', 'may', 'an']);
+  const ES_WORDS = new Set(['de', 'la', 'que', 'el', 'en', 'y', 'los', 'del', 'las', 'por', 'una', 'con', 'para', 'es', 'se', 'su', 'al', 'lo', 'como', 'más']);
+  // Sentence language, so Spanish alternatives are never offered inside an English sentence or the other way round.
+  function isEnglish(t) {
+    let en = 0;
+    let es = 0;
+    (t.toLowerCase().match(/\p{L}+/gu) || []).forEach((w) => { if (EN_WORDS.has(w)) en++; if (ES_WORDS.has(w)) es++; });
+    return en > es;
+  }
 
   function alternatives(terms) {
     const seen = new Set();
@@ -91,20 +102,40 @@
     return out;
   }
 
-  // Tips for one analysed sentence, strongest reason first.
-  function suggest(s) {
+  // Lengths of the prose sentences next to s, so the tips can name real numbers.
+  function neighbourLengths(s, doc) {
+    const prose = (doc && doc.sentences ? doc.sentences : []).filter((o) => !o.excluded);
+    const i = prose.indexOf(s);
+    return i < 0 ? [] : prose.slice(Math.max(0, i - 2), i + 3).filter((o) => o !== s).map((o) => o.words);
+  }
+
+  // Tips for one analysed sentence, strongest reason first. `doc` is the whole analysis, used for numbers.
+  function suggest(s, doc) {
     if (!s || s.excluded) return [];
+    const near = neighbourLengths(s, doc);
+    const tipFor = (label) => {
+      if (label === 'Longitud de frase típica de IA') {
+        return `Tiene ${s.words} palabras, dentro del rango en el que suele escribir la IA (de 14 a 32). Déjala en 13 o menos quitando lo que no aporte, o llévala a 33 o más uniendo otra idea.`;
+      }
+      if ((label === 'Frases vecinas de longitud casi idéntica' || label === 'Frases vecinas de longitud regular') && near.length) {
+        return `Las frases de alrededor miden ${near.join(', ')} palabras y esta ${s.words}. Haz esta claramente más corta (de 5 a 8 palabras) o más larga (35 o más) que ellas.`;
+      }
+      return TIPS[label];
+    };
     const tips = s.reasons
       .filter((r) => r.weight > 0 && TIPS[r.label])
       .sort((a, b) => b.weight - a.weight)
       .map((r) => {
-        const t = { label: r.label, tip: TIPS[r.label], alts: [] };
+        const t = { label: r.label, tip: tipFor(r.label), alts: [] };
         if (r.label === 'Frases hechas típicas de IA' || r.label === 'Palabras comodín' || r.label === 'Empieza con conector formal') {
           t.alts = alternatives(r.detail);
         }
         return t;
       });
     // Flagged mostly because of its neighbours: own score below the bar, context pushes it over.
+    if (s.ai && doc && doc.docReasons && doc.docReasons.length) {
+      tips.push({ label: 'Párrafos de tamaño casi idéntico', tip: 'Todos los párrafos miden casi lo mismo. Alarga uno de ellos o acorta otro, aunque sea uniendo dos.', alts: [] });
+    }
     if (s.ai && s.own < s.threshold) {
       tips.push({ label: 'Pesa el contexto', tip: 'Esta frase por sí sola no llega al umbral; la arrastran las de alrededor. Revisa también las frases vecinas marcadas.', alts: [] });
     }
@@ -121,8 +152,27 @@
   const SPLITS = [
     [', y ', '. Y '], [', pero ', '. Pero '], ['; ', '. '], [', aunque ', '. Aunque '], [', ya que ', '. Es que '],
     [', lo que ', '. Eso '], [', porque ', '. Porque '], [', mientras que ', '. En cambio, '], [', por lo que ', '. Así que '],
-    [', which ', '. That '], [', but ', '. But '], [', and ', '. And '],
+    [', de modo que ', '. Así, '], [', así que ', '. Así que '], [', es decir, ', '. Es decir, '], [', sin embargo, ', '. Sin embargo, '],
+    [', dado que ', '. Es que '], [', puesto que ', '. Es que '], [', y por eso ', '. Por eso '], [', y por ello ', '. Por ello '],
+    [', y además ', '. Además '], [', y también ', '. También '], [', por tanto, ', '. Por tanto, '], [', de ahí que ', '. De ahí que '],
+    [', which ', '. That '], [', but ', '. But '], [', and ', '. And '], [', so ', '. So '], [', although ', '. Although '],
   ];
+  // Low-information adverbs that can go without changing what the sentence says.
+  const ADVERBS = ['con frecuencia', 'a menudo', 'en gran medida', 'en general', 'en la actualidad', 'hoy en día', 'actualmente',
+    'generalmente', 'habitualmente', 'principalmente', 'especialmente', 'particularmente', 'básicamente', 'realmente', 'claramente',
+    'simplemente', 'sencillamente', 'prácticamente', 'bastante', 'muy', 'casi', 'incluso', 'tal vez', 'quizá', 'quizás', 'en realidad',
+    'de hecho', 'sin duda', 'por supuesto', 'todavía',
+    // en
+    'very', 'really', 'quite', 'actually', 'basically', 'generally', 'typically', 'particularly', 'especially', 'essentially', 'simply',
+    'clearly', 'often', 'almost', 'currently', 'in general', 'in fact', 'of course'];
+  // Closing clauses that only decorate the main one ("..., dando lugar a una estructura blanda").
+  const TAIL = /,\s+(?:dando lugar|lo que permite|lo cual|permitiendo|facilitando|garantizando|asegurando|fomentando|promoviendo|contribuyendo|ayudando|favoreciendo|convirtiéndose|haciendo que|generando|provocando|dejando|situándose|marcando|constituyendo|representando|suponiendo|reflejando|mostrando|poniendo|allowing|enabling|making|helping|ensuring|providing|leading|creating|offering|which means|which allows|which makes)(?![\p{L}])[^,;.!?]*(?=[.!?…]+["»”’)]*$)/iu;
+  // Looser closing clauses (relative, concessive, hedges). Dropping them loses more, so they come after TAIL.
+  const TAIL2 = /,\s+(?:que|donde|cuando|cuyo|cuya|cuyos|cuyas|tal vez|quizá|quizás|probablemente|sobre todo|incluso|según|como|aunque|mientras)(?![\p{L}])[^;.!?]*(?=[.!?…]+["»”’)]*$)/iu;
+  // An aside between two commas that starts like an apposition or a participle clause.
+  const ASIDE = /,\s+((?:como|según|incluyendo|es decir|por ejemplo|en particular|sobre todo|tanto|especialmente|\p{L}+(?:ado|ada|ados|adas|ido|ida|idos|idas|ante|ando|iendo))\s[^,;.!?]{8,90}),\s+/iu;
+  const FRONT = /^((?:en|a|durante|hoy|con|por|desde|tras|según|gracias|ante|hasta|hace|para)\s[^,]{3,45}),\s+(?=\p{L})/iu;
+  const wc = (t) => (t.match(/[\p{L}\p{N}'’-]+/gu) || []).length;
 
   const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
   function tidy(s) {
@@ -143,7 +193,8 @@
 
   function edits(text) {
     const list = [];
-    const keys = Object.keys(ALTS).filter((k) => !SKIP.test(k)).sort((a, b) => b.length - a.length);
+    const dict = isEnglish(text) ? ALTS_EN : ALTS_ES;
+    const keys = Object.keys(dict).filter((k) => !SKIP.test(k)).sort((a, b) => b.length - a.length);
     const m = text.match(ROLE);
     if (m) {
       const plural = /n$/i.test(m[1]);
@@ -153,7 +204,7 @@
     keys.forEach((k) => {
       const re = termRe(k);
       if (!re.test(text)) return;
-      ALTS[k].forEach((a) => list.push((t) => t.replace(re, (hit) => (a && /^\p{Lu}/u.test(hit) ? cap(a) : a))));
+      dict[k].forEach((a) => list.push((t) => t.replace(re, (hit) => (a && /^\p{Lu}/u.test(hit) ? cap(a) : a))));
     });
     list.push((t) => t.replace(/\s*[—–]\s*/g, ', '));
     list.push((t) => t.replace(/no se trata (?:solo |solamente |únicamente )?de ([^,;.]+),\s?sino (?:de )?([^.;]+)/i, 'más que $1, es $2'));
@@ -168,30 +219,170 @@
           const a = t.slice(0, i).split(/\s+/).length;
           const b = t.slice(i + from.length).split(/\s+/).length;
           const off = Math.abs(a - b);
-          if (a >= 5 && b >= 5 && (!best || off < best.off)) best = { off, s: t.slice(0, i) + to + t.slice(i + from.length) };
+          // "A, B, y C" closes a list: splitting there leaves C stranded.
+          const closesList = /^, (?:y|and|e|o|or) $/.test(from) && t.slice(0, i).includes(',');
+          if (a >= 5 && b >= 5 && !closesList && (!best || off < best.off)) best = { off, s: t.slice(0, i) + to + t.slice(i + from.length) };
           i = t.toLowerCase().indexOf(from, i + 1);
         }
       });
       return best ? best.s : t;
     });
+    // Shortening edits come last: they lose a little information, so they only apply when nothing gentler works.
+    const shorter = (f) => (t) => { const r = f(t); return wc(r) >= 6 ? r : t; };
+    ADVERBS.filter((a) => termRe(a).test(text)).forEach((a) => {
+      const re = new RegExp('(,\\s*)?(?<![\\p{L}\\p{N}])' + esc(a) + '(?![\\p{L}\\p{N}])(\\s*,)?', 'iu');
+      list.push(shorter((t) => t.replace(re, (m, before, after) => (before && after ? ',' : ' '))));
+    });
+    list.push(shorter((t) => t.replace(TAIL, '')));
+    // "A y el debate cambió" can become two sentences, but only when the second half brings its own subject.
+    list.push((t) => {
+      let best = null;
+      [[' y ', '. Y '], [' pero ', '. Pero ']].forEach(([from, to]) => {
+        let i = t.toLowerCase().indexOf(from);
+        while (i > 0) {
+          const rest = t.slice(i + from.length);
+          const first = (rest.match(/^\p{L}+/u) || [''])[0].toLowerCase();
+          const a = wc(t.slice(0, i));
+          const b = wc(rest);
+          const off = Math.abs(a - b);
+          if (a >= 5 && b >= 5 && LOWER_OK.has(first) && !t.slice(0, i).includes(',') && !isEnglish(t) && (!best || off < best.off)) best = { off, s: t.slice(0, i) + to + rest };
+          i = t.toLowerCase().indexOf(from, i + 1);
+        }
+      });
+      return best ? best.s : t;
+    });
+    list.push(shorter((t) => t.replace(ASIDE, ' ')));
+    list.push(shorter((t) => t.replace(TAIL2, '')));
+    list.push(shorter((t) => { const m = t.match(FRONT); return m && wc(m[1]) <= 6 ? t.slice(m[0].length) : t; }));
     return list;
   }
 
-  // score(candidate) returns { p, ai } for the candidate placed back in the text.
-  function humanize(text, score) {
-    let best = text;
-    let bestScore = score(text);
-    const start = bestScore;
-    for (let pass = 0; pass < 2; pass++) {
-      for (const edit of edits(best)) {
-        const c = tidy(edit(best));
-        if (!c || c === best || c.split(/\s+/).length < 3) continue;
-        const sc = score(c);
-        if (sc.p < bestScore.p - 0.005) { best = c; bestScore = sc; }
-      }
-    }
-    return { text: best, before: start, after: bestScore, changed: best !== text };
+  // First words that stay the same when they move from the start of a sentence to the middle of one.
+  const LOWER_OK = new Set(['el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 'este', 'esta', 'estos', 'estas', 'ese', 'esa', 'esos',
+    'esas', 'su', 'sus', 'mi', 'mis', 'en', 'de', 'a', 'con', 'por', 'para', 'sin', 'sobre', 'tras', 'ante', 'durante', 'desde', 'hasta',
+    'según', 'entre', 'esto', 'eso', 'ello', 'lo', 'se', 'cuando', 'aunque', 'mientras', 'si', 'como', 'cada', 'todo', 'todos', 'todas',
+    'muchos', 'muchas', 'algunos', 'algunas', 'otros', 'otras', 'también', 'además', 'así', 'pero', 'no', 'aun', 'hoy', 'ahora',
+    'the', 'a', 'an', 'this', 'that', 'these', 'those', 'in', 'on', 'at', 'with', 'for', 'from', 'by', 'it', 'they', 'he', 'she', 'we', 'however',
+    'also', 'but', 'so', 'as', 'when', 'while', 'if', 'many', 'some', 'most', 'there', 'their', 'its', 'his', 'her', 'our', 'these', 'such']);
+  // Two sentences as one, with a semicolon. Null when the second one starts with a name or something unknown.
+  function join(a, b) {
+    const first = (b.match(/^\p{L}+/u) || [''])[0];
+    if (!/[.]$/.test(a) || !/[.!?…]$/.test(b) || /^[¿¡]/.test(b) || !LOWER_OK.has(first.toLowerCase()) || first !== first.charAt(0).toUpperCase() + first.slice(1).toLowerCase()) return null;
+    return a.replace(/[.]+$/, '') + '; ' + b.charAt(0).toLowerCase() + b.slice(1);
   }
 
-  root.PolidetectorTips = { suggest, humanize, TIPS, ALTS };
+  // Scores a candidate sentence placed back in the whole text: the sentences it covers and the share of flagged
+  // sentences in the document, because a rewrite also changes how its neighbours are read.
+  function scoreCandidate(text, from, to, cand) {
+    const r = root.Polidetector.analyze(text.slice(0, from) + cand + text.slice(to));
+    const end = from + cand.length;
+    const hit = r.sentences.filter((o) => !o.excluded && o.end > from && o.start < end);
+    return {
+      p: hit.length ? Math.max(...hit.map((o) => o.p)) : Infinity,
+      ai: hit.some((o) => o.ai),
+      frac: r.evaluatedSentences ? r.aiSentences / r.evaluatedSentences : 0,
+      pct: r.percentAI,
+    };
+  }
+
+  // Looks for a rewrite of the flagged sentence s that lowers its score without raising the share of flagged
+  // sentences in the text. It stops at the first rewrite that clears the flag, so changes stay as small as
+  // possible: single edits first, then pairs of edits when no single one is enough.
+  function propose(text, base, s, budget) {
+    const limit = budget || 500;
+    let evals = 0;
+    const score = (cand) => { evals++; return scoreCandidate(text, s.start, s.end, cand); };
+    const start = { p: s.p, ai: s.ai, frac: base.evaluatedSentences ? base.aiSentences / base.evaluatedSentences : 0, pct: base.percentAI };
+    const ok = (a, b) => a.frac <= b.frac + 1e-9 && a.p < b.p - 0.005;
+    const valid = (c, from) => c && c !== from && wc(c) >= 3;
+    let cur = Object.assign({ text: s.text }, start);
+    for (let pass = 0; pass < 3 && cur.ai; pass++) {
+      let moved = false;
+      for (const edit of edits(cur.text)) {
+        if (evals >= limit) break;
+        const c = tidy(edit(cur.text));
+        if (!valid(c, cur.text)) continue;
+        const sc = score(c);
+        if (ok(sc, cur)) { cur = Object.assign({ text: c }, sc); moved = true; if (!cur.ai) break; }
+      }
+      if (!moved) break;
+    }
+    if (cur.ai) {
+      search: for (const e1 of edits(s.text)) {
+        const c1 = tidy(e1(s.text));
+        if (!valid(c1, s.text)) continue;
+        for (const e2 of edits(c1)) {
+          if (evals >= limit) break search;
+          const c2 = tidy(e2(c1));
+          if (!valid(c2, c1)) continue;
+          const sc = score(c2);
+          if (isFinite(sc.p) && !sc.ai && sc.frac <= start.frac + 1e-9) { cur = Object.assign({ text: c2 }, sc); break search; }
+        }
+      }
+    }
+    let span = { start: s.start, end: s.end, merged: false };
+    // Last resort: join it with a neighbouring sentence that is flagged too, so only flagged sentences change.
+    if (cur.ai) {
+      const i = base.sentences.indexOf(s);
+      for (const n of [base.sentences[i + 1], base.sentences[i - 1]]) {
+        if (!n || n.excluded || !n.ai || n.para !== s.para) continue;
+        const after = n.start > s.start;
+        const joined = after ? join(s.text, n.text) : join(n.text, s.text);
+        if (!joined) continue;
+        const from = after ? s.start : n.start;
+        const to = after ? n.end : s.end;
+        const sc = scoreCandidate(text, from, to, joined);
+        if (isFinite(sc.p) && !sc.ai && sc.frac <= start.frac + 1e-9) {
+          cur = Object.assign({ text: joined }, sc);
+          span = { start: from, end: to, merged: true };
+          break;
+        }
+      }
+    }
+    const original = text.slice(span.start, span.end);
+    return { text: cur.text, before: start, after: cur, changed: cur.text !== original, solved: !cur.ai, start: span.start, end: span.end, merged: span.merged };
+  }
+
+  // Rewrites only the sentences flagged as AI. It goes from the last to the first so earlier offsets stay valid,
+  // and reads the text again after each one: a change can clear a neighbour that was flagged only by its context.
+  // A rewrite is kept when it clears the flag or lowers the sentence's score clearly.
+  async function humanizeAll(text, onProgress) {
+    const first = root.Polidetector.analyze(text);
+    const targets = first.sentences.filter((s) => s.ai).map((s) => s.start);
+    let cur = text;
+    let base = first;
+    const changes = [];
+    const left = [];
+    for (let k = targets.length - 1; k >= 0; k--) {
+      if (onProgress) onProgress(targets.length - 1 - k, targets.length);
+      await new Promise((r) => setTimeout(r, 0));
+      if (k < targets.length - 1) base = root.Polidetector.analyze(cur);
+      const s = base.sentences.find((o) => !o.excluded && o.start === targets[k]);
+      if (!s || !s.ai) continue;
+      const res = propose(cur, base, s);
+      // A join must not swallow a sentence that was already rewritten.
+      const swallows = res.merged && changes.some((c) => c.start >= res.start && c.start < res.end);
+      if (res.changed && !swallows && (res.solved || res.before.p - res.after.p >= 0.05)) {
+        const before = cur.slice(res.start, res.end);
+        cur = cur.slice(0, res.start) + res.text + cur.slice(res.end);
+        const delta = res.text.length - before.length;
+        changes.forEach((c) => { c.start += delta; c.end += delta; });
+        changes.push({ start: res.start, end: res.start + res.text.length, before, after: res.text, solved: res.solved, merged: res.merged });
+      } else {
+        left.push(s.text);
+      }
+    }
+    const last = root.Polidetector.analyze(cur);
+    changes.sort((a, b) => a.start - b.start);
+    return {
+      text: cur,
+      changes,
+      left,
+      flagged: targets.length,
+      before: { pct: first.percentAI, ai: first.aiSentences, n: first.evaluatedSentences },
+      after: { pct: last.percentAI, ai: last.aiSentences, n: last.evaluatedSentences },
+    };
+  }
+
+  root.PolidetectorTips = { suggest, propose, humanizeAll, TIPS, ALTS };
 })(typeof window !== 'undefined' ? window : globalThis);

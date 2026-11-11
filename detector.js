@@ -99,7 +99,7 @@
       if ('.!?…'.includes(c)) {
         if (c === '.' && /\d/.test(text[i + 1] || '') && /\d/.test(text[i - 1] || '')) continue;
         let j = i + 1;
-        while (j < text.length && '.!?…"»”\')]'.includes(text[j])) j++;
+        while (j < text.length && '.!?…"»”’\')]'.includes(text[j])) j++;
         if (j >= text.length || /\s/.test(text[j])) { push(j); start = j; i = j - 1; }
       }
     }
@@ -129,9 +129,11 @@
     // Spanish dialogue opens with an em dash. Style rules cannot tell human from AI dialogue, so it is
     // left out instead of being counted as human.
     if (/^\s*—/u.test(line)) return 'diálogo';
-    if (/^\s*(?:[-*•·▪◦–—]\s|\d+[.)]\s|[a-z][.)]\s)/iu.test(line)) return 'lista';
+    // The private-use range holds the bullets Word draws with its Symbol and Wingdings fonts.
+    if (/^\s*(?:[-*•·▪◦–—-]\s|\d+[.)]\s|[a-z][.)]\s)/iu.test(line)) return 'lista';
     if (/^\s*#{1,6}\s/u.test(line)) return 'título';
-    if (/\t|\|/.test(line) || / {3,}\S/.test(line.trim())) return 'tabla';
+    // Columns are separated by a tab or by a run of spaces; one run in a long line is just uneven spacing.
+    if (/\t|\|/.test(line) || (line.trim().match(/\S {3,}(?=\S)/g) || []).length >= 2) return 'tabla';
     const letters = (s.match(/\p{L}/gu) || []).length;
     if (/[{}=<>^\\]|\);?$/.test(s) || letters / Math.max(s.replace(/\s/g, '').length, 1) < 0.5) return 'fórmula o código';
     if (!/[.!?…:;"»”)]$/u.test(line.trim()) && words < 12) return 'título';
@@ -199,9 +201,26 @@
   };
   const LOOKALIKE_RE = new RegExp('[' + Object.keys(LOOKALIKE).join('') + ']', 'g');
 
+  // Text pasted from Word, Google Docs, e-mail or a PDF carries layout that is not part of the writing: tab or
+  // space indents, non-breaking spaces, line separators other than \n and lines cut mid-sentence. Left alone, a
+  // leading tab made the whole text look like a table and nothing was evaluated.
+  function tidyLayout(text) {
+    return text
+      .replace(/\r\n?|[\u2028\u2029\u000B\u000C\u0085]/g, '\n')
+      .replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g, ' ')
+      .replace(/[\u2010\u2011\u2012]/g, '-')
+      .replace(/[ \t]+$/gm, '')
+      .replace(/^[ \t]+/gm, '')
+      // A tab used as the space after a full stop is not a table column.
+      .replace(/([.!?…]["»”’)]?)\t+(?=\S)/g, '$1 ')
+      .replace(/([.!?…:;)”"»]) {3,}(?=\S)/g, '$1  ')
+      // A line that does not end a sentence and is followed by a lowercase one was cut by the page width.
+      .replace(/([^\n.!?…:;"»”’)\]])\n(?=\p{Ll})/gu, '$1 ');
+  }
+
   function clean(text) {
     const invisible = (text.match(INVISIBLE) || []).length;
-    let out = text.replace(INVISIBLE, '').normalize('NFC');
+    let out = tidyLayout(text.replace(INVISIBLE, '')).normalize('NFC');
     let lookalikes = 0;
     out = out.replace(/\p{L}+/gu, (w) => {
       if (!/\p{Script=Latin}/u.test(w) || !/[\p{Script=Cyrillic}\p{Script=Greek}]/u.test(w)) return w;
@@ -227,7 +246,8 @@
       if (le < 0) le = text.length;
       const line = text.slice(ls, le);
       if (ls !== lastLine) {
-        if (/\n\s*\n\s*$/.test(text.slice(0, ls)) || lastLine === -1) para++;
+        // Word and Google Docs separate paragraphs with a single line break, so one that follows a finished sentence counts.
+        if (/\n\s*\n\s*$/.test(text.slice(0, ls)) || /[.!?…:;"»”’)]\n$/.test(text.slice(0, ls)) || lastLine === -1) para++;
         lastLine = ls;
         if (REF_HEADING.test(line)) inRefs = true;
       }
