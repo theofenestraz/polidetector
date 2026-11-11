@@ -379,7 +379,9 @@
     };
   }
 
-  const api = { analyze, segment, DEFAULTS };
+  // Same cleaning analyze() applies first, for the page to normalise pasted text.
+  const tidy = (text) => tidyLayout((text || '').replace(INVISIBLE, '')).normalize('NFC');
+  const api = { analyze, segment, tidy, DEFAULTS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Polidetector = api;
 })(typeof window !== 'undefined' ? window : globalThis);

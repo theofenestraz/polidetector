@@ -13,3 +13,5 @@ Para probarlo en local:
 ```bash
 python3 -m http.server 8765
 ```
+
+Las tipografías (Libre Franklin, Source Serif 4 y Spline Sans Mono, con licencia SIL Open Font License) se sirven desde la carpeta `fonts/`, así que la página no pide nada a servidores externos.

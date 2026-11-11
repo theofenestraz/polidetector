@@ -7,129 +7,141 @@
 <meta name="description" content="Pega un texto y mira qué frases suenan a inteligencia artificial. Todo se analiza en tu navegador.">
 <link rel="icon" href="favicon.svg?v=1" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=13">
+<link rel="stylesheet" href="styles.css?v=22">
 </head>
 <body>
-<header class="top">
-  <h1 class="brand">Polidetector</h1>
-  <p class="tagline">Pega un texto y mira qué frases suenan a inteligencia artificial, con los criterios que publica Turnitin. Nada sale de tu navegador.</p>
-</header>
-
-<main class="layout form">
-  <section class="sheet field" aria-labelledby="lblText">
-    <h2 class="field-label" id="lblText">Texto</h2>
-    <div id="editor">
-      <label for="input" class="sr-only">Texto a analizar</label>
-      <textarea id="input" spellcheck="false" placeholder="Pega aquí tu texto. Hacen falta al menos 300 palabras de prosa para dar un porcentaje."></textarea>
-    </div>
-    <div id="marked" class="marked" hidden></div>
-    <div class="toolbar">
-      <button id="analyze" class="btn primary" type="button">Analizar</button>
-      <button id="edit" class="btn" type="button" hidden>Editar texto</button>
-      <button id="undo" class="btn" type="button" hidden>Deshacer cambio</button>
-      <button id="clear" class="btn" type="button">Borrar texto</button>
-      <button id="sample" class="btn ghost" type="button">Probar con un ejemplo</button>
-      <span id="count" class="count">0 palabras</span>
-    </div>
-  </section>
-
-  <aside class="panel field" aria-live="polite" aria-labelledby="lblResult">
-    <h2 class="field-label" id="lblResult">Resultado</h2>
-    <div id="empty" class="empty">
-      <p>Cuando analices un texto verás aquí qué parte de la prosa parece escrita por IA, con los mismos criterios que aplica Turnitin.</p>
-      <dl class="legend">
-        <div><dt><span class="swatch ai"></span></dt><dd>Frase clasificada como IA</dd></div>
-        <div><dt><span class="swatch human"></span></dt><dd>Frase clasificada como humana</dd></div>
-        <div><dt><span class="swatch excl"></span></dt><dd>No evaluada (listas, títulos, referencias, tablas, código, diálogos)</dd></div>
-      </dl>
-    </div>
-
-    <div id="result" hidden>
-      <div class="stamp" id="stamp">
-        <p class="band-name" id="bandName"></p>
-        <p class="score"><span id="pct">0</span><span class="unit" id="unit">%</span></p>
-        <p class="score-label" id="scoreLabel">de la prosa evaluada tiene rasgos de IA</p>
+<div class="board" id="board" data-band="none">
+  <main class="leaf" data-impeccable-ignore="hard-offset-shadow">
+    <header class="head">
+      <h1 class="brand">Polidetector</h1>
+      <p class="tagline">Pega un texto y mira qué frases suenan a IA, con los criterios que publica Turnitin. Nada sale de tu navegador.</p>
+      <div class="head-actions">
+        <button id="sample" class="btn ghost" type="button">Probar con un ejemplo</button>
+        <button id="clear" class="btn ghost" type="button">Borrar texto</button>
       </div>
-      <div class="bar" role="img" id="bar">
-        <span class="seg ai" id="segAI"></span><span class="seg human" id="segHuman"></span>
-      </div>
-      <p id="meta" class="meta"></p>
-      <p id="verdict" class="verdict"></p>
-      <button id="reveal" class="btn small" type="button" hidden>Ver las frases igualmente</button>
-      <div id="humanizeBox" class="humanize-box" hidden>
-        <button id="humanizeAll" class="btn primary humanize" type="button">Humanizar todo</button>
-        <button id="humanize" class="btn humanize" type="button">Humanizar frase por frase</button>
-        <p class="hint">«Humanizar todo» reescribe solo las frases marcadas y puedes deshacerlo con un clic. «Frase por frase» te deja decidir cada cambio.</p>
-      </div>
-      <div id="bulk" class="bulk" aria-live="polite" hidden>
-        <p id="bulkProgress" class="meta"></p>
-        <p id="bulkSummary" class="bulk-summary" hidden></p>
-        <details id="bulkList" class="bulk-list" hidden>
-          <summary>Ver las frases cambiadas</summary>
-          <ol id="bulkItems"></ol>
-        </details>
-        <p id="bulkLeft" class="meta" hidden></p>
-      </div>
+    </header>
 
-      <div id="signalsBox">
-        <h2 class="h">Lo que más pesa en las frases marcadas</h2>
-        <ul id="signals" class="signals"></ul>
-      </div>
+    <div class="work">
+      <section class="editor" aria-labelledby="lblText">
+        <h2 class="sr-only" id="lblText">Texto</h2>
+        <div class="page" id="page">
+          <div class="mirror" id="mirror" aria-hidden="true"></div>
+          <label for="input" class="sr-only">Texto a analizar</label>
+          <textarea id="input" spellcheck="false" placeholder="Pega aquí tu texto o escríbelo. Hacen falta al menos 300 palabras de prosa para dar un porcentaje. Se vuelve a analizar solo mientras escribes."></textarea>
+          <div class="start" id="start"><button id="sampleBig" class="btn primary" type="button">Probar con un ejemplo</button><span>o pega aquí tu texto desde Word, Google Docs o un PDF</span></div>
+        </div>
+        <div class="statusbar">
+          <span id="count" class="mono">0 palabras</span>
+          <span id="live" class="mono" aria-live="off"></span>
+          <button id="undo" class="btn small" type="button" hidden>Deshacer cambio</button>
+        </div>
+      </section>
 
-      <div id="detail" class="detail" hidden>
-        <h2 class="h">Frase seleccionada</h2>
-        <p id="detailP" class="detail-p"></p>
-        <ul id="detailList" class="signals"></ul>
-        <div id="fix">
-          <h2 class="h">Humanizar esta frase</h2>
-          <ul id="tips" class="tips"></ul>
-          <div id="example" class="example" hidden>
-            <p class="fix-label">Ejemplo humanizado (borrador automático)</p>
-            <p id="exampleText" class="example-text"></p>
-            <p id="exampleNote" class="example-note"></p>
-            <div class="fix-actions">
-              <button id="applyExample" class="btn small primary" type="button">Usar este ejemplo</button>
-              <button id="useExample" class="btn small" type="button">Copiar al cuadro</button>
+      <aside class="panel" aria-labelledby="lblResult" aria-live="polite">
+        <h2 class="sr-only" id="lblResult">Resultado</h2>
+        <div id="empty" class="empty">
+          <p class="lead">Cuando haya texto verás aquí qué parte de la prosa parece escrita por IA, con los mismos criterios que aplica Turnitin.</p>
+          <dl class="legend">
+            <div><dt><span class="swatch ai"></span></dt><dd>Frase clasificada como IA</dd></div>
+            <div><dt><span class="swatch human"></span></dt><dd>Frase clasificada como humana</dd></div>
+            <div><dt><span class="swatch excl"></span></dt><dd>No evaluada (listas, títulos, referencias, tablas, código, diálogos)</dd></div>
+          </dl>
+        </div>
+
+        <div id="result" hidden>
+          <div class="verdict-row" id="stamp" data-state="none">
+            <p class="score"><span id="pct">0</span><span class="unit" id="unit">%</span></p>
+            <div class="verdict-text">
+              <h3 class="band-name" id="bandName"></h3>
+              <p class="score-label" id="scoreLabel">de la prosa evaluada tiene rasgos de IA</p>
             </div>
           </div>
-          <label for="rewrite" class="fix-label">Tu versión de la frase</label>
-          <textarea id="rewrite" class="rewrite" rows="4" spellcheck="true"></textarea>
-          <div class="fix-actions">
-            <button id="apply" class="btn small primary" type="button">Aplicar y volver a analizar</button>
-            <button id="next" class="btn small" type="button">Siguiente frase marcada</button>
+          <div class="bar" role="img" id="bar"><span class="seg ai" id="segAI"></span></div>
+          <p id="verdict" class="verdict"></p>
+          <p id="meta" class="meta"></p>
+          <button id="reveal" class="btn small" type="button" hidden>Ver las frases igualmente</button>
+
+          <div id="humanizeBox" class="humanize-box" hidden>
+            <button id="humanizeAll" class="btn primary" type="button">Humanizar todo</button>
+            <button id="humanize" class="btn" type="button">Frase por frase</button>
           </div>
-          <p id="delta" class="delta" hidden></p>
+          <p class="hint" id="hint">«Humanizar todo» reescribe solo las frases marcadas y se puede deshacer. «Frase por frase» te deja decidir cada cambio. También puedes pulsar una frase del texto.</p>
+
+          <div id="bulk" class="bulk" aria-live="polite" hidden>
+            <p id="bulkProgress" class="meta"></p>
+            <p id="bulkSummary" class="bulk-summary" hidden></p>
+            <details id="bulkList" class="bulk-list" hidden>
+              <summary>Ver las frases cambiadas</summary>
+              <ol id="bulkItems"></ol>
+            </details>
+            <p id="bulkLeft" class="meta" hidden></p>
+          </div>
+
+          <section id="detail" class="detail" hidden>
+            <h3 class="h" id="detailHead">Frase seleccionada</h3>
+            <p id="detailP" class="detail-p"></p>
+            <div id="fix">
+              <div id="example" class="example" hidden>
+                <p class="fix-label">Ejemplo humanizado (borrador automático)</p>
+                <p id="exampleText" class="example-text"></p>
+                <p id="exampleNote" class="example-note"></p>
+                <div class="fix-actions">
+                  <button id="applyExample" class="btn small primary" type="button">Usar este ejemplo</button>
+                  <button id="useExample" class="btn small" type="button">Copiar al cuadro</button>
+                </div>
+              </div>
+              <label for="rewrite" class="fix-label">Tu versión de la frase</label>
+              <textarea id="rewrite" class="rewrite" rows="4" spellcheck="true"></textarea>
+              <div class="fix-actions">
+                <button id="apply" class="btn small primary" type="button">Aplicar y volver a analizar</button>
+                <button id="next" class="btn small" type="button">Siguiente frase marcada</button>
+              </div>
+              <p id="delta" class="delta" hidden></p>
+              <h3 class="h">Consejos para esta frase</h3>
+              <ul id="tips" class="tips"></ul>
+              <h3 class="h">Por qué está marcada</h3>
+              <ul id="detailList" class="signals"></ul>
+            </div>
+          </section>
+
+          <div id="signalsBox">
+            <h3 class="h">Lo que más pesa en las frases marcadas</h3>
+            <ul id="signals" class="signals"></ul>
+          </div>
         </div>
-      </div>
-      <p class="hint" id="hint">Toca cualquier frase del texto para ver por qué se ha clasificado así y cómo reescribirla.</p>
+
+        <details class="about">
+              <summary>¿Qué criterios sigue y cuánto fiarse?</summary>
+              <p>Polidetector aplica las reglas que Turnitin publica en su centro de ayuda sobre su detector de IA:</p>
+              <ul>
+                <li>Solo evalúa frases de prosa. Las listas, títulos, referencias, tablas, fórmulas y código se quitan y no cuentan en el porcentaje. Polidetector quita además las líneas de diálogo, porque con sus reglas no se puede distinguir un diálogo humano de uno escrito por IA.</li>
+                <li>Cada frase recibe una puntuación entre 0 y 1 teniendo en cuenta las frases de alrededor. Si supera el umbral es IA y si no, humana.</li>
+                <li>El porcentaje es la proporción de frases evaluadas que salen como IA, no del texto entero.</li>
+                <li>Hacen falta al menos 300 palabras de prosa y como mucho 30.000.</li>
+                <li>Entre el 1 % y el 19 % se muestra «*%», sin cifra ni subrayados, porque ahí los falsos positivos son más probables.</li>
+                <li>El resultado se resume en tres bandas provisionales: sin conclusión (menos del 40 %), dudoso (del 40 % al 59 %) e indicio fuerte (60 % o más). Estas bandas no son de Turnitin. Un resultado bajo no demuestra que el texto sea humano.</li>
+                <li>Al tocar una frase marcada verás consejos para reescribirla, alternativas a las expresiones típicas de IA y un ejemplo reescrito con esas mismas reglas. El ejemplo es un borrador: las reglas no entienden el sentido de la frase, así que revísalo antes de usarlo. Que baje aquí la puntuación no garantiza que baje en Turnitin ni en otros detectores.</li>
+                <li>«Humanizar todo» aplica ese mismo ejemplo a cada frase marcada, y solo a esas: quita muletillas y adverbios, parte frases largas o une dos marcadas. Solo se queda con un cambio si no sube el porcentaje de IA del texto. Siempre puedes volver atrás con «Deshacer cambio».</li>
+                <li>Al pegar desde Word, Google Docs o un PDF se limpian las sangrías, los espacios y saltos de línea raros y las líneas cortadas por el ancho de página, para que no se tomen por tablas ni se dejen sin evaluar.</li>
+                <li>Las primeras y últimas frases necesitan una puntuación más alta, porque las introducciones y conclusiones genéricas dan más falsos positivos. En textos de menos de 10 frases no se aplica, porque casi todas serían de principio o final.</li>
+              </ul>
+              <p>Lo que no se puede copiar es el modelo de Turnitin, que es privado. Aquí la puntuación de cada frase sale de rasgos de estilo: a favor de IA, frases hechas, palabras comodín y frases de longitud muy regular; a favor de humano, tono coloquial, primera persona, frases largas con muchas comas, nombres y cifras exactas y erratas de tecleo. Antes de analizar se quitan los caracteres invisibles y las letras de otros alfabetos camufladas, un truco habitual para engañar a los detectores.</p>
+              <p>Ningún detector es infalible, tampoco los comerciales: la IA bien escrita o retocada puede pasar como humana, y algunos textos humanos muy formales pueden parecer IA. Toma el resultado como un indicio, nunca como una prueba, y puede no coincidir con el que te daría Turnitin. Polidetector no es un producto de Turnitin ni está relacionado con él. Tu texto no sale del navegador.</p>
+            </details>
+      </aside>
     </div>
+    <nav class="tabs" id="tabs" aria-label="Párrafos del texto" hidden></nav>
+  </main>
 
-    <details class="about">
-      <summary>¿Qué criterios sigue y cuánto fiarse?</summary>
-      <p>Polidetector aplica las reglas que Turnitin publica en su centro de ayuda sobre su detector de IA:</p>
-      <ul>
-        <li>Solo evalúa frases de prosa. Las listas, títulos, referencias, tablas, fórmulas y código se quitan y no cuentan en el porcentaje. Polidetector quita además las líneas de diálogo, porque con sus reglas no se puede distinguir un diálogo humano de uno escrito por IA.</li>
-        <li>Cada frase recibe una puntuación entre 0 y 1 teniendo en cuenta las frases de alrededor. Si supera el umbral es IA y si no, humana.</li>
-        <li>El porcentaje es la proporción de frases evaluadas que salen como IA, no del texto entero.</li>
-        <li>Hacen falta al menos 300 palabras de prosa y como mucho 30.000.</li>
-        <li>Entre el 1 % y el 19 % se muestra «*%», sin cifra ni subrayados, porque ahí los falsos positivos son más probables.</li>
-        <li>El resultado se resume en tres bandas provisionales: sin conclusión (menos del 40 %), dudoso (del 40 % al 59 %) e indicio fuerte (60 % o más). Estas bandas no son de Turnitin. Un resultado bajo no demuestra que el texto sea humano.</li>
-        <li>Al tocar una frase marcada verás consejos para reescribirla, alternativas a las expresiones típicas de IA y un ejemplo reescrito con esas mismas reglas. El ejemplo es un borrador: las reglas no entienden el sentido de la frase, así que revísalo antes de usarlo. Que baje aquí la puntuación no garantiza que baje en Turnitin ni en otros detectores.</li>
-        <li>«Humanizar todo» aplica ese mismo ejemplo a cada frase marcada, y solo a esas: quita muletillas y adverbios, parte frases largas o une dos marcadas. Solo se queda con un cambio si no sube el porcentaje de IA del texto. Siempre puedes volver atrás con «Deshacer cambio».</li>
-        <li>Al pegar desde Word, Google Docs o un PDF se limpian las sangrías, los espacios y saltos de línea raros y las líneas cortadas por el ancho de página, para que no se tomen por tablas ni se dejen sin evaluar.</li>
-        <li>Las primeras y últimas frases necesitan una puntuación más alta, porque las introducciones y conclusiones genéricas dan más falsos positivos. En textos de menos de 10 frases no se aplica, porque casi todas serían de principio o final.</li>
-      </ul>
-      <p>Lo que no se puede copiar es el modelo de Turnitin, que es privado. Aquí la puntuación de cada frase sale de rasgos de estilo: a favor de IA, frases hechas, palabras comodín y frases de longitud muy regular; a favor de humano, tono coloquial, primera persona, frases largas con muchas comas, nombres y cifras exactas y erratas de tecleo. Antes de analizar se quitan los caracteres invisibles y las letras de otros alfabetos camufladas, un truco habitual para engañar a los detectores.</p>
-      <p>Ningún detector es infalible, tampoco los comerciales: la IA bien escrita o retocada puede pasar como humana, y algunos textos humanos muy formales pueden parecer IA. Toma el resultado como un indicio, nunca como una prueba, y puede no coincidir con el que te daría Turnitin. Polidetector no es un producto de Turnitin ni está relacionado con él. Tu texto no sale del navegador.</p>
-    </details>
-  </aside>
-</main>
+  <div class="dock" id="dock" hidden>
+    <p class="dock-score"><b id="dockPct">0</b><span id="dockUnit">%</span></p>
+    <p class="dock-band" id="dockBand"></p>
+    <button id="dockAll" class="btn primary small" type="button">Humanizar todo</button>
+  </div>
+</div>
 
-<script src="detector.js?v=14"></script>
+<script src="detector.js?v=15"></script>
 <script src="sugerencias.js?v=5"></script>
-<script src="app.js?v=17"></script>
+<script src="app.js?v=21"></script>
 </body>
 </html>
