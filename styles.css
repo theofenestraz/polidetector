@@ -21,9 +21,8 @@
   --yellow: #f2c200;
   --orange: #e0701c;
   --teal: #0b7f86;
-  --violet: #5b3fa0;
   --sienna: #8c4a2a;
-  --board: var(--violet);
+  --board: var(--blue);
   --mark-fill: rgba(224, 112, 28, 0.2);
   --mark-hit: rgba(224, 112, 28, 0.38);
   --mark-line: #c2560e;
@@ -49,7 +48,6 @@
     --yellow: #b58f00;
     --orange: #b4540f;
     --teal: #0a6a70;
-    --violet: #46307f;
     --sienna: #6e3a20;
     --mark-fill: rgba(240, 130, 50, 0.24);
     --mark-hit: rgba(240, 130, 50, 0.42);
@@ -88,7 +86,7 @@ body {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .3 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
   transition: background-color var(--step);
 }
-.board[data-band="none"] { --board: var(--violet); }
+.board[data-band="none"] { --board: var(--blue); }
 .board[data-band="short"] { --board: var(--teal); }
 .board[data-band="sin-conclusion"] { --board: var(--blue); }
 .board[data-band="dudoso"] { --board: var(--yellow); }
