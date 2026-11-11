@@ -215,8 +215,8 @@ body {
   border-top: 1px solid var(--rule);
   color: var(--pencil);
 }
-.statusbar .btn { margin-left: auto; }
-#live { margin-left: 0; }
+.statusbar #copyAll { margin-left: auto; }
+.statusbar .btn + .btn { margin-left: 0; }
 
 /* The fore edge: one tab per paragraph. Height follows its length, hue follows its share of flagged sentences. */
 .tabs {

@@ -50,6 +50,7 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
     const n = words(input.value);
     $('count').textContent = n === 1 ? '1 palabra' : n + ' palabras';
     $('clear').disabled = n === 0;
+    $('copyAll').disabled = n === 0;
     $('page').classList.toggle('empty', n === 0);
   };
 
@@ -599,6 +600,22 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
     }
   }
 
+  // Copies the whole text as it stands in the box, so a humanized version can go straight to Word.
+  async function copyAll() {
+    const text = input.value;
+    if (!text) return;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch (e) {
+      const keep = [input.selectionStart, input.selectionEnd];
+      input.select();
+      ok = document.execCommand('copy');
+      input.setSelectionRange(keep[0], keep[1]);
+    }
+    const btn = $('copyAll');
+    btn.textContent = ok ? 'Copiado' : 'No se pudo copiar';
+    setTimeout(() => { btn.textContent = 'Copiar todo'; }, 1800);
+  }
+
   input.addEventListener('input', onInput);
   input.addEventListener('scroll', () => { syncMirror(); updateCurTab(); }, { passive: true });
   input.addEventListener('paste', (e) => {
@@ -632,6 +649,7 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
   $('sampleBig').addEventListener('click', () => loadText(SAMPLE));
   $('clear').addEventListener('click', () => loadText(''));
   $('undo').addEventListener('click', undo);
+  $('copyAll').addEventListener('click', copyAll);
   $('reveal').addEventListener('click', () => { revealed = true; analyzeNow(); });
   $('humanizeAll').addEventListener('click', humanizeAll);
   $('dockAll').addEventListener('click', humanizeAll);
