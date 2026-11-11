@@ -201,7 +201,7 @@ body {
 
 .s { border-radius: 3px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 .s.ai { background: var(--mark-fill); text-decoration: underline wavy var(--mark-line) 1.5px; text-underline-offset: 6px; }
-.s.ex { background: var(--excl); text-decoration: underline dotted var(--pencil) 1px; text-underline-offset: 6px; }
+.s.ex { background: var(--excl); text-decoration: line-through var(--pencil) 1.5px; }
 .s.new { box-shadow: 0 2px 0 var(--ink-soft); }
 .s.sel { outline: 2px solid var(--ink); outline-offset: 2px; background-color: rgba(36, 58, 154, 0.1); }
 .s.ai.sel { background-color: var(--mark-hit); }
@@ -275,7 +275,7 @@ body {
 .swatch { display: inline-block; width: 26px; height: 14px; margin-top: 4px; border-radius: 2px; }
 .swatch.ai { background: var(--mark-fill); border-bottom: 2px solid var(--mark-line); }
 .swatch.human { border-bottom: 2px solid var(--rule); }
-.swatch.excl { background: var(--excl); border-bottom: 1px dotted var(--pencil); }
+.swatch.excl { background: linear-gradient(var(--pencil), var(--pencil)) center / 100% 1.5px no-repeat, var(--excl); }
 
 .verdict-row { display: flex; align-items: center; gap: 16px; }
 .score { margin: 0; font-weight: 800; font-size: clamp(3.6rem, 6vw, 5.6rem); line-height: 0.9; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
