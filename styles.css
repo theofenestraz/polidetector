@@ -135,6 +135,9 @@ body {
   gap: 12px;
 }
 .mark-logo { width: 44px; height: 44px; flex: none; }
+/* Small signature under the name, lined up with the word rather than the logo. */
+.brand-block { display: flex; flex-direction: column; }
+.firma { margin: 2px 0 0 56px; font: italic 400 0.8rem/1.2 var(--read); color: var(--ink-soft); letter-spacing: 0.01em; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .mark-logo { background: var(--leaf-solid); background: #f8f6ef; border-radius: 50%; padding: 3px; }
 }
@@ -398,6 +401,14 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   .board, .leaf::before, .leaf::after, .tab, .seg, .btn { transition: none; }
+}
+
+/* Small phones: a smaller name and buttons that may wrap, so nothing runs past the leaf. */
+@media (max-width: 370px) {
+  .brand { font-size: 1.45rem; gap: 10px; }
+  .mark-logo { width: 36px; height: 36px; }
+  .firma { margin-left: 46px; }
+  .head-actions { flex-wrap: wrap; gap: 6px 14px; justify-content: flex-start; }
 }
 
 /* With a sentence open, the panel gives its room to the rewrite controls. */
