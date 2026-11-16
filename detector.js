@@ -233,12 +233,13 @@
     's_lexai', 's_lexhum', 's_phrase', 's_buzz', 's_dash', 's_opener', 's_triad', 's_notx', 's_bold',
     's_typical', 's_short', 's_long', 's_loglen', 's_wlen', 's_comma', 's_informal', 's_filler', 's_expr',
     's_lower', 's_first', 's_names', 's_figure', 's_year', 's_digits', 's_paren', 's_quote', 's_colon',
-    's_question', 's_imperfect', 's_cvflat', 's_cvreg', 's_cvvar',
+    's_question', 's_imperfect', 's_cvflat', 's_cvreg', 's_cvvar', 's_ingcoma',
     'd_cv', 'd_meanlen', 'd_lex', 'd_lexai', 'd_mattr', 'd_comma', 'd_names', 'd_figure', 'd_question', 'd_first',
     'd_informal', 'd_short', 'd_long', 'd_opener', 'd_wlen', 'd_paren', 'd_quote', 'd_colon',
   ].concat(Array.from({ length: FW_N }, (_, i) => 'd_fw_' + String(i).padStart(3, '0')))
     .concat(Array.from({ length: ST_N }, (_, i) => 'd_st_' + String(i).padStart(2, '0')))
-    .concat(PUNCT.map((_, i) => 'd_pu_' + i));
+    .concat(PUNCT.map((_, i) => 'd_pu_' + i))
+    .concat(['d_ngram']);
 
   const SFEATS = FEATS.filter((k) => k.startsWith('s_'));
 
@@ -254,9 +255,9 @@
     s_filler: 'Muletillas de conversación', s_expr: 'Puntuación expresiva (!!, ...)', s_lower: 'Empieza en minúscula',
     s_first: 'Habla en primera persona', s_short: 'Frase muy corta', s_long: 'Frase muy larga y enredada',
     s_loglen: 'Longitud de la frase', s_comma: 'Comas por palabra', s_imperfect: 'Erratas de tecleo',
-    s_paren: 'Paréntesis', s_quote: 'Citas entre comillas', s_colon: 'Dos puntos o punto y coma', s_question: 'Pregunta',
+    s_ingcoma: 'Coletilla con gerundio («…, highlighting»)', s_paren: 'Paréntesis', s_quote: 'Citas entre comillas', s_colon: 'Dos puntos o punto y coma', s_question: 'Pregunta',
     d_cv: 'Frases de longitud muy pareja en todo el texto', d_meanlen: 'Longitud media de las frases',
-    d_lex: 'Vocabulario típico de IA en todo el texto', d_lexai: 'Vocabulario típico de IA en todo el texto', d_mattr: 'Variedad de vocabulario del texto',
+    d_ngram: 'Palabras y pares de palabras típicos de IA', d_lex: 'Vocabulario típico de IA en todo el texto', d_lexai: 'Vocabulario típico de IA en todo el texto', d_mattr: 'Variedad de vocabulario del texto',
     d_comma: 'Comas en todo el texto', d_names: 'Pocos nombres propios en todo el texto',
     d_figure: 'Pocas cifras o fechas en todo el texto', d_question: 'Preguntas en el texto', d_first: 'Primera persona en el texto',
     d_informal: 'Tono coloquial en el texto', d_short: 'Frases cortas en el texto', d_long: 'Frases largas en el texto',
@@ -296,7 +297,11 @@
     return total / (tokens.length - win + 1);
   }
 
-  function sentenceFeatures(s, text, lex) {
+  // English participle tails after a comma ("…, highlighting the need"): far more frequent in AI prose in every
+  // source group of the calibration half. Nouns that merely end in -ing are left out.
+  const ING_TAIL = /,\s+(?:[A-Za-z]+ly\s+)?(?!(?:some|no|every|any)thing\b|during\b|morning\b|evening\b|ceiling\b|(?:off)?spring\b|string\b)[A-Za-z]{3,}ing\b/g;
+
+  function sentenceFeatures(s, text, lex, lang) {
     const t = s.text;
     const words = s.words;
     const hits = [];
@@ -365,6 +370,12 @@
     f.s_question = /[?¿]/.test(t) ? 1 : 0;
     // Typing slips LLMs never make: double spaces, a doubled word, a space before punctuation.
     const gap = text.slice(Math.max(0, s.start - 3), s.start);
+    f.s_ingcoma = 0;
+    if (lang === 'en') {
+      const tails = collect(ING_TAIL, t, 'phrase', hits);
+      f.s_ingcoma = Math.min(tails.length, 2);
+      if (tails.length) details.s_ingcoma = tails.map((x) => x.replace(/^,\s*/, '')).join(', ');
+    }
     f.s_imperfect = / {2}/.test(gap) || /\S {2,}\S/.test(t) || /(?<![\p{L}])(\p{L}+) \1(?![\p{L}])/iu.test(t) || / [,.;:]/.test(t) ? 1 : 0;
     return { f, hits, details };
   }
@@ -410,7 +421,7 @@
     const proseWords = prose.reduce((n, s) => n + s.words, 0);
 
     // Sentence features, then the local length rhythm (humans vary sentence length much more than LLMs do).
-    const per = prose.map((s) => sentenceFeatures(s, text, lex));
+    const per = prose.map((s) => sentenceFeatures(s, text, lex, lang));
     const lens = prose.map((s) => s.words);
     per.forEach((p, i) => {
       const win = lens.slice(Math.max(0, i - 2), i + 3);
@@ -457,6 +468,24 @@
     }
     const proseText = prose.map((s) => s.text).join(' ');
     PUNCT.forEach((re, i) => { D['d_pu_' + i] = clamp((100 * (proseText.match(re) || []).length) / Math.max(proseWords, 1), 0, 20); });
+    // Word n-gram score (unigrams and pairs inside a sentence), learned by calibracion/ngramas.py: log(1 + count)
+    // times 10 / sqrt(tokens), summed over the listed n-grams. Only English has one.
+    D.d_ngram = 0;
+    if (LM.ngram) {
+      const counts = new Map();
+      let ntok = 0;
+      prose.forEach((s) => {
+        const ws = (s.text.toLowerCase().match(LEXWORD) || []).map((w) => w.replace(/’/g, "'"));
+        ntok += ws.length;
+        ws.forEach((w, i) => {
+          counts.set(w, (counts.get(w) || 0) + 1);
+          if (i + 1 < ws.length) { const g = w + ' ' + ws[i + 1]; counts.set(g, (counts.get(g) || 0) + 1); }
+        });
+      });
+      let sum = 0;
+      counts.forEach((c, g) => { if (Object.prototype.hasOwnProperty.call(LM.ngram.w, g)) sum += LM.ngram.w[g] * Math.log1p(c); });
+      D.d_ngram = LM.ngram.b + (sum * 10) / Math.sqrt(Math.max(ntok, 1));
+    }
     // Text-level logit. The model sees the mean of each sentence feature (m_*) and the whole-text features (d_*).
     // Reasons compare the text with the average training text, so they say what this text has more of.
     SFEATS.forEach((k) => { D['m_' + k] = per.length ? mean(per.map((p) => p.f[k])) : 0; });
@@ -548,6 +577,8 @@
         doc: FEATS.filter((k) => k[0] === 'd').map((k) => D[k]),
         s: prose.map((s) => FEATS.filter((k) => k[0] === 's').map((k) => s.f[k])),
         para: prose.map((s) => s.para),
+        named: D,
+        toks: C.tokens ? prose.map((s) => (s.text.toLowerCase().match(LEXWORD) || []).map((w) => w.replace(/’/g, "'"))) : undefined,
       };
     }
     return out;

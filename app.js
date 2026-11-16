@@ -575,7 +575,7 @@ Ahora estoy intentando usarla de otra forma: primero hago el ejercicio yo, aunqu
       $('bulk').hidden = false;
       const joined = res.changes.filter((c) => c.merged).length;
       $('bulkSummary').hidden = false;
-      $('bulkSummary').textContent = `He reescrito ${plural(res.changes.length, 'frase', 'frases')} de las ${res.flagged} marcadas${joined ? ` (${plural(joined, 'unión de dos frases', 'uniones de dos frases')})` : ''}. IA en el texto: ${shownPct(res.before.pct)} → ${shownPct(res.after.pct)}. Las demás frases no se han tocado. Están subrayadas en el texto y puedes volver atrás con «Deshacer cambio».${last.status === 'short' ? ` El texto se ha quedado por debajo de ${last.minWords} palabras de prosa, así que ya no se muestra el porcentaje.` : ''}`;
+      $('bulkSummary').textContent = `He cambiado ${plural(res.changes.length, 'tramo', 'tramos')} del texto${joined ? ` (${plural(joined, 'unión de dos frases', 'uniones de dos frases')})` : ''}; antes había ${plural(res.flagged, 'frase marcada', 'frases marcadas')}. IA en el texto: ${shownPct(res.before.pct)} → ${shownPct(res.after.pct)}. Los cambios están subrayados y puedes volver atrás con «Deshacer cambio». Revísalos: son reglas automáticas (contracciones, conectores, palabras más corrientes, frases partidas) y no comprueban el sentido de cada frase.${last.status === 'short' ? ` El texto se ha quedado por debajo de ${last.minWords} palabras de prosa, así que ya no se muestra el porcentaje.` : ''}`;
       const items = $('bulkItems');
       items.textContent = '';
       res.changes.forEach((c) => {
