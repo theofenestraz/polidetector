@@ -1,4 +1,6 @@
-// Polidetector: heuristic AI-text detector. Runs entirely in the browser (also loadable from Node for tests).
+// Polidetector: AI-text detector for Spanish and English. Runs entirely in the browser (also loadable from jsc/Node
+// for tests). Each prose sentence gets a vector of style features; a logistic model per language, trained on
+// labelled corpora (calibracion/entrenar.py, weights in modelo.js), turns them into a score in context.
 (function (root) {
   'use strict';
 
@@ -78,10 +80,12 @@
   const TRIAD = /(?<![\p{L}])[\p{L}]+(?:\s[\p{L}]+)?,\s[\p{L}]+(?:\s[\p{L}]+)?,?\s(?:y|e|o|and|or)\s[\p{L}]+/iu;
   const NOT_X_BUT_Y = /(?:no\s(?:se\strata|es)\s[^.;]{1,60},\s?sino)|(?:(?:it's|it\sis)\snot\s(?:just\s|only\s|about\s)?[^.;]{1,50}[,;—–]\s?(?:it's|it\sis|but))/iu;
   const WORD = /[\p{L}\p{N}'’-]+/gu;
+  const LEXWORD = /[\p{L}]+(?:['’][\p{L}]+)?/gu;
 
   const sigmoid = (x) => 1 / (1 + Math.exp(-x));
   const mean = (a) => a.reduce((s, v) => s + v, 0) / (a.length || 1);
   const stdev = (a) => { const m = mean(a); return Math.sqrt(mean(a.map((v) => (v - m) ** 2))); };
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
   // Split into sentences keeping character offsets so the UI can highlight the original text.
   function segment(text) {
@@ -130,7 +134,7 @@
     // left out instead of being counted as human.
     if (/^\s*—/u.test(line)) return 'diálogo';
     // The private-use range holds the bullets Word draws with its Symbol and Wingdings fonts.
-    if (/^\s*(?:[-*•·▪◦–—-]\s|\d+[.)]\s|[a-z][.)]\s)/iu.test(line)) return 'lista';
+    if (/^\s*(?:[-*•·▪◦–—-]\s|\d+[.)]\s|[a-z][.)]\s)/iu.test(line)) return 'lista';
     if (/^\s*#{1,6}\s/u.test(line)) return 'título';
     // Columns are separated by a tab or by a run of spaces; one run in a long line is just uneven spacing.
     if (/\t|\|/.test(line) || (line.trim().match(/\S {3,}(?=\S)/g) || []).length >= 2) return 'tabla';
@@ -141,52 +145,20 @@
     return null;
   }
 
-  // Every weight and threshold lives here so calibrar.html can tune them against a labelled corpus.
-  // Values from the 2026-11-02 calibration (639 dated human and AI texts, calibracion/ajustar.sh): openers and
-  // triads do not separate the classes; human texts stand out by very long sentences and concrete names and figures.
+  // Settings that are not learned. The model (weights, sentence threshold) comes from modelo.js.
   const DEFAULTS = {
     minWords: 300,
     maxWords: 30000,
-    base: -0.4,
-    threshold: 0.6,
-    // Provisional band cuts over the % of AI sentences, from the calibration corpus. Below bandDudoso nothing can be
-    // concluded, because AI texts land there too, so a low score never counts as proof of human writing.
+    // Band cuts over the % of AI sentences. Chosen on the calibration half so that almost no human text reaches
+    // bandDudoso (see calibracion/INFORME-2026-11.md). Below it the text is reported as having no clear signs of AI.
     bandDudoso: 40,
     bandFuerte: 60,
     // Turnitin reports more false positives in generic intro/conclusion sentences and raised the bar there.
-    edgeThreshold: 0.7,
+    edgeExtra: 0.1,
     edge: 2,
     edgeMinSentences: 10,
-    ownWeight: 0.7,
+    ownWeight: 0.6,
     context: 3,
-    paraUniform: 0.3,
-    phrase: 0.8,
-    buzz: 0.3,
-    dash: -0.3,
-    opener: 0,
-    triad: 0,
-    notXbutY: 1.4,
-    bold: 0.6,
-    burstFlat: 1,
-    burstRegular: 0.25,
-    burstVaried: -0.5,
-    typicalLength: 0.7,
-    longVocab: 0,
-    informal: -1.4,
-    filler: -0.45,
-    expressive: -0.6,
-    lowercase: -0.6,
-    firstPerson: -0.2,
-    veryShort: -0.4,
-    veryLong: -1,
-    longWords: 40,
-    commaDense: -0.8,
-    commaRate: 0.12,
-    listItemWords: 0,
-    specificNames: 3,
-    specificYears: false,
-    specific: -1.2,
-    imperfect: -0.8,
   };
 
   // Evasion tricks that break word matching without changing how the text looks (RAID and SilverSpeak
@@ -229,12 +201,190 @@
     return { text: out, invisible, lookalikes };
   }
 
+  // Language from the most frequent function words. Only Spanish and English are supported.
+  const ES_WORDS = new Set(['de', 'la', 'que', 'el', 'en', 'y', 'los', 'se', 'del', 'las', 'por', 'un', 'para', 'con', 'una', 'su', 'al', 'es', 'lo', 'como', 'más', 'pero', 'sus', 'le', 'ya', 'o', 'este', 'sí', 'porque', 'esta', 'entre', 'cuando', 'muy', 'sin', 'sobre', 'también']);
+  const EN_WORDS = new Set(['the', 'of', 'and', 'to', 'in', 'a', 'is', 'that', 'for', 'it', 'as', 'with', 'was', 'on', 'be', 'by', 'at', 'this', 'are', 'from', 'or', 'an', 'but', 'not', 'have', 'they', 'which', 'you', 'were', 'their', 'has', 'had', 'his', 'her', 'we', 'he']);
+  function detectLang(text) {
+    let es = 0;
+    let en = 0;
+    (text.toLowerCase().match(LEXWORD) || []).slice(0, 3000).forEach((w) => { if (ES_WORDS.has(w)) es++; if (EN_WORDS.has(w)) en++; });
+    return es >= en ? 'es' : 'en';
+  }
+
+  // Function words, the classic authorship signal: their rates hardly depend on the topic and LLMs overuse
+  // some and avoid others. Their rate per 100 words of prose enters the model as d_fw_N, N being the list position.
+  const FW = {
+    es: ["de", "la", "que", "el", "en", "y", "a", "los", "se", "del", "las", "un", "por", "con", "no", "una", "su", "para", "es", "al", "lo", "como", "más", "pero", "sus", "le", "ya", "o", "este", "sí", "porque", "esta", "entre", "cuando", "muy", "sin", "sobre", "también", "me", "hasta", "hay", "donde", "quien", "desde", "todo", "nos", "durante", "todos", "uno", "les", "ni", "contra", "otros", "ese", "eso", "ante", "ellos", "e", "esto", "mí", "antes", "algunos", "qué", "unos", "yo", "otro", "otras", "otra", "él", "tanto", "esa", "estos", "mucho", "quienes", "nada", "muchos", "cual", "poco", "ella", "estar", "estas", "algunas", "algo", "nosotros", "mi", "mis", "tú", "te", "ti", "tu", "tus", "ellas", "nosotras", "vosotros", "os", "mío", "mía", "tuyo", "suyo", "suya", "nuestro", "nuestra", "cada", "mismo", "misma", "así", "aunque", "mientras", "sino", "pues", "luego", "entonces", "aún", "además", "tal", "incluso", "solo", "bien", "ahora", "hoy", "siempre", "nunca", "aquí", "allí", "ser", "son", "fue", "era", "han", "ha", "había", "tiene", "tienen", "hace", "puede", "pueden", "debe", "hacer", "cómo"],
+    en: ["the", "of", "and", "to", "a", "in", "that", "is", "it", "for", "as", "with", "was", "on", "be", "by", "at", "this", "are", "from", "or", "an", "but", "not", "have", "they", "which", "you", "were", "their", "has", "had", "his", "her", "we", "he", "she", "its", "been", "there", "would", "will", "can", "more", "one", "all", "about", "if", "so", "what", "when", "who", "no", "out", "up", "them", "than", "some", "could", "into", "only", "other", "also", "my", "me", "i", "our", "us", "your", "do", "does", "did", "just", "because", "then", "these", "those", "very", "much", "such", "how", "most", "even", "should", "may", "might", "must", "any", "each", "both", "many", "while", "where", "over", "after", "before", "through", "between", "however", "although", "though", "yet", "it's", "don't", "i'm", "can't", "didn't", "doesn't", "isn't", "that's", "there's", "i've", "you're", "won't"],
+  };
+  const FW_N = Math.max(FW.es.length, FW.en.length);
+
+  // First words of sentences: LLMs reuse a few openings ("This", "These", "Additionally", "Este", "Además").
+  const STARTS = {
+    es: ["el", "la", "los", "las", "en", "este", "esta", "estos", "estas", "es", "un", "una", "su", "sus", "por", "para", "con", "además", "sin", "pero", "aunque", "así", "también", "no", "se", "lo", "como", "cuando", "si", "y", "de", "al", "ya", "hoy"],
+    en: ["the", "this", "these", "it", "in", "as", "a", "an", "its", "their", "they", "there", "we", "i", "he", "she", "but", "however", "additionally", "furthermore", "moreover", "while", "by", "for", "with", "when", "if", "one", "such", "that", "our"],
+  };
+  const ST_N = Math.max(STARTS.es.length, STARTS.en.length);
+  // Punctuation per 100 words of prose.
+  const PUNCT = [/;/g, /:/g, /\(/g, /[«»“”"]/g, /[—–]/g, / - /g, /[?¿]/g, /[!¡]/g];
+
+  // Feature names, in the order of the vectors dumped for training. s_* belong to the sentence, d_* to the text.
+  const FEATS = [
+    's_lexai', 's_lexhum', 's_phrase', 's_buzz', 's_dash', 's_opener', 's_triad', 's_notx', 's_bold',
+    's_typical', 's_short', 's_long', 's_loglen', 's_wlen', 's_comma', 's_informal', 's_filler', 's_expr',
+    's_lower', 's_first', 's_names', 's_figure', 's_year', 's_digits', 's_paren', 's_quote', 's_colon',
+    's_question', 's_imperfect', 's_cvflat', 's_cvreg', 's_cvvar',
+    'd_cv', 'd_meanlen', 'd_lex', 'd_lexai', 'd_mattr', 'd_comma', 'd_names', 'd_figure', 'd_question', 'd_first',
+    'd_informal', 'd_short', 'd_long', 'd_opener', 'd_wlen', 'd_paren', 'd_quote', 'd_colon',
+  ].concat(Array.from({ length: FW_N }, (_, i) => 'd_fw_' + String(i).padStart(3, '0')))
+    .concat(Array.from({ length: ST_N }, (_, i) => 'd_st_' + String(i).padStart(2, '0')))
+    .concat(PUNCT.map((_, i) => 'd_pu_' + i));
+
+  const SFEATS = FEATS.filter((k) => k.startsWith('s_'));
+
+  // How each feature is explained to the person. Labels with a tip in sugerencias.js keep their old wording.
+  const LABELS = {
+    s_lexai: 'Palabras comodín', s_buzz: 'Palabras comodín', s_phrase: 'Frases hechas típicas de IA',
+    s_dash: 'Rayas (—) como pausa', s_opener: 'Empieza con conector formal', s_triad: 'Enumeración de tres elementos',
+    s_notx: 'Estructura «no es X, sino Y»', s_bold: 'Negritas dentro del texto', s_typical: 'Longitud de frase típica de IA',
+    s_cvflat: 'Frases vecinas de longitud casi idéntica', s_cvreg: 'Frases vecinas de longitud regular',
+    s_cvvar: 'Frases vecinas de longitud muy variada', s_wlen: 'Vocabulario largo y formal',
+    s_lexhum: 'Palabras corrientes o datos concretos', s_names: 'Nombres o cifras concretas', s_figure: 'Nombres o cifras concretas',
+    s_year: 'Nombres o cifras concretas', s_digits: 'Nombres o cifras concretas', s_informal: 'Tono coloquial',
+    s_filler: 'Muletillas de conversación', s_expr: 'Puntuación expresiva (!!, ...)', s_lower: 'Empieza en minúscula',
+    s_first: 'Habla en primera persona', s_short: 'Frase muy corta', s_long: 'Frase muy larga y enredada',
+    s_loglen: 'Longitud de la frase', s_comma: 'Comas por palabra', s_imperfect: 'Erratas de tecleo',
+    s_paren: 'Paréntesis', s_quote: 'Citas entre comillas', s_colon: 'Dos puntos o punto y coma', s_question: 'Pregunta',
+    d_cv: 'Frases de longitud muy pareja en todo el texto', d_meanlen: 'Longitud media de las frases',
+    d_lex: 'Vocabulario típico de IA en todo el texto', d_lexai: 'Vocabulario típico de IA en todo el texto', d_mattr: 'Variedad de vocabulario del texto',
+    d_comma: 'Comas en todo el texto', d_names: 'Pocos nombres propios en todo el texto',
+    d_figure: 'Pocas cifras o fechas en todo el texto', d_question: 'Preguntas en el texto', d_first: 'Primera persona en el texto',
+    d_informal: 'Tono coloquial en el texto', d_short: 'Frases cortas en el texto', d_long: 'Frases largas en el texto',
+    d_opener: 'Conectores formales al empezar frase', d_wlen: 'Palabras largas en todo el texto',
+    d_paren: 'Paréntesis en el texto', d_quote: 'Citas entre comillas en el texto', d_colon: 'Dos puntos o punto y coma en el texto',
+  };
+
+  // Function words, sentence openings and punctuation enter the model one by one; they are explained as groups.
+  function labelFor(k) {
+    if (k.startsWith('d_fw_')) return 'Palabras gramaticales en proporciones típicas de IA';
+    if (k.startsWith('d_st_')) return 'Comienzos de frase típicos de IA';
+    if (k.startsWith('d_pu_')) return 'Uso de la puntuación típico de IA';
+    return LABELS[k];
+  }
+
+  function model() {
+    return root.PolidetectorModelo || { es: { bias: 0, w: {}, threshold: 0.5 }, en: { bias: 0, w: {}, threshold: 0.5 }, lexico: { es: {}, en: {} } };
+  }
+
+  // Moving-average type-token ratio over 50-word windows: vocabulary variety that does not depend on length.
+  function mattr(tokens, win) {
+    if (tokens.length < win) return tokens.length ? new Set(tokens).size / tokens.length : 0;
+    const counts = new Map();
+    let distinct = 0;
+    let total = 0;
+    for (let i = 0; i < tokens.length; i++) {
+      const t = tokens[i];
+      counts.set(t, (counts.get(t) || 0) + 1);
+      if (counts.get(t) === 1) distinct++;
+      if (i >= win) {
+        const o = tokens[i - win];
+        counts.set(o, counts.get(o) - 1);
+        if (counts.get(o) === 0) distinct--;
+      }
+      if (i >= win - 1) total += distinct / win;
+    }
+    return total / (tokens.length - win + 1);
+  }
+
+  function sentenceFeatures(s, text, lex) {
+    const t = s.text;
+    const words = s.words;
+    const hits = [];
+    const f = {};
+    const details = {};
+    const lw = (t.match(LEXWORD) || []);
+    let lexAi = 0;
+    let lexHum = 0;
+    const aiWords = [];
+    LEXWORD.lastIndex = 0;
+    let m;
+    while ((m = LEXWORD.exec(t)) !== null) {
+      // Own keys only: a plain object lookup would return inherited members such as lex['constructor'].
+      const k = m[0].toLowerCase();
+      const w = Object.prototype.hasOwnProperty.call(lex, k) ? lex[k] : 0;
+      if (typeof w !== 'number' || !w) continue;
+      if (w > 0) {
+        lexAi += w;
+        if (w >= 0.6) { aiWords.push(m[0]); hits.push({ from: m.index, to: m.index + m[0].length, kind: 'buzz' }); }
+      } else lexHum += w;
+    }
+    const norm = Math.sqrt(Math.max(lw.length, 1));
+    f.s_lexai = clamp(lexAi / norm, 0, 3);
+    f.s_lexhum = clamp(lexHum / norm, -3, 0);
+    if (aiWords.length) details.s_lexai = aiWords.join(', ');
+
+    const phrases = collect(PHRASES, t, 'phrase', hits);
+    f.s_phrase = Math.min(phrases.length, 3);
+    if (phrases.length) details.s_phrase = phrases.join(', ');
+    const buzz = collect(BUZZ, t, 'buzz', hits).filter((b) => !phrases.some((p) => p.toLowerCase().includes(b.toLowerCase())));
+    f.s_buzz = Math.min(buzz.length, 3);
+    if (buzz.length) details.s_buzz = buzz.join(', ');
+    f.s_dash = Math.min(collect(DASH, t, 'dash', hits).length, 2);
+    f.s_opener = OPENERS.test(t) ? 1 : 0;
+    if (f.s_opener) details.s_opener = t.match(OPENERS)[0];
+    f.s_triad = TRIAD.test(t) ? 1 : 0;
+    f.s_notx = NOT_X_BUT_Y.test(t) ? 1 : 0;
+    f.s_bold = /\*\*[^*]+\*\*/.test(t) ? 1 : 0;
+    f.s_typical = words >= 14 && words <= 32 ? 1 : 0;
+    f.s_short = words < 6 ? 1 : 0;
+    f.s_long = words > 40 ? 1 : 0;
+    f.s_loglen = clamp(Math.log(Math.max(words, 1)) - Math.log(20), -2, 2);
+    const letters = (t.match(/\p{L}/gu) || []).length;
+    f.s_wlen = clamp(letters / Math.max(words, 1) - 5, -2, 3);
+    f.s_comma = clamp(((t.match(/,/g) || []).length / Math.max(words, 1)) * 10, 0, 3);
+    const informal = collect(INFORMAL_STRONG, t, 'human', hits).concat(collect(LAUGH, t, 'human', hits));
+    f.s_informal = Math.min(informal.length, 2);
+    if (informal.length) details.s_informal = informal.join(', ');
+    const weak = collect(INFORMAL_WEAK, t, 'human', hits);
+    f.s_filler = Math.min(weak.length, 2);
+    if (weak.length) details.s_filler = weak.join(', ');
+    f.s_expr = /[!?]{2,}|\.{3}|…/.test(t) ? 1 : 0;
+    f.s_lower = /^[\p{Ll}]/u.test(t) ? 1 : 0;
+    FIRST_PERSON.lastIndex = 0;
+    f.s_first = FIRST_PERSON.test(t) ? 1 : 0;
+    FIRST_PERSON.lastIndex = 0;
+    // Capitalised words mid-sentence (names), exact figures (decimals, thousands, percentages) and years.
+    const names = (t.slice(1).match(/(?<![.!?:«“"]\s)(?<=\s)\p{Lu}\p{Ll}+/gu) || []).length;
+    f.s_names = Math.min(names, 4);
+    f.s_figure = /\d[.,]\d|\d\s?%/.test(t) ? 1 : 0;
+    f.s_year = /(?<!\d)(?:1[5-9]|20)\d{2}(?!\d)/.test(t) ? 1 : 0;
+    f.s_digits = /\d/.test(t) ? 1 : 0;
+    f.s_paren = /\(/.test(t) ? 1 : 0;
+    f.s_quote = /[«»“”"]/.test(t) ? 1 : 0;
+    f.s_colon = /[:;]/.test(t) ? 1 : 0;
+    f.s_question = /[?¿]/.test(t) ? 1 : 0;
+    // Typing slips LLMs never make: double spaces, a doubled word, a space before punctuation.
+    const gap = text.slice(Math.max(0, s.start - 3), s.start);
+    f.s_imperfect = / {2}/.test(gap) || /\S {2,}\S/.test(t) || /(?<![\p{L}])(\p{L}+) \1(?![\p{L}])/iu.test(t) || / [,.;:]/.test(t) ? 1 : 0;
+    return { f, hits, details };
+  }
+
   function analyze(text, opts) {
     const C = Object.assign({}, DEFAULTS, opts);
     const cleaned = clean(text || '');
     text = cleaned.text;
     const sentences = segment(text);
     const totalWords = (text.match(WORD) || []).length;
+    const lang = C.lang || detectLang(text);
+    const M = model();
+    const LM = M[lang] || {};
+    const lex = (M.lexico && M.lexico[lang]) || {};
+    const DW = Object.assign({}, (LM.doc && LM.doc.w) || {}, C.docW || {});
+    const DMU = (LM.doc && LM.doc.mu) || {};
+    const SW = Object.assign({}, (LM.sent && LM.sent.w) || {}, C.sentW || {});
+    const docBias = C.docBias !== undefined ? C.docBias : (LM.doc ? LM.doc.bias : 0);
+    const alpha = C.alpha !== undefined ? C.alpha : (LM.alpha !== undefined ? LM.alpha : 1);
+    const threshold = C.threshold !== undefined ? C.threshold : (LM.threshold !== undefined ? LM.threshold : 0.5);
 
     // Tag each sentence with its paragraph and whether it qualifies as prose.
     let inRefs = false;
@@ -259,91 +409,105 @@
     const prose = sentences.filter((s) => !s.excluded);
     const proseWords = prose.reduce((n, s) => n + s.words, 0);
 
-    // Burstiness: humans vary sentence length much more than LLMs do.
+    // Sentence features, then the local length rhythm (humans vary sentence length much more than LLMs do).
+    const per = prose.map((s) => sentenceFeatures(s, text, lex));
     const lens = prose.map((s) => s.words);
-    const burst = lens.map((_, i) => {
+    per.forEach((p, i) => {
       const win = lens.slice(Math.max(0, i - 2), i + 3);
-      if (win.length < 4) return null;
-      const cv = stdev(win) / mean(win);
-      if (cv < 0.25) return { label: 'Frases vecinas de longitud casi idéntica', weight: C.burstFlat };
-      if (cv < 0.4) return { label: 'Frases vecinas de longitud regular', weight: C.burstRegular };
-      if (cv > 0.7) return { label: 'Frases vecinas de longitud muy variada', weight: C.burstVaried };
-      return null;
+      const cv = win.length >= 4 ? stdev(win) / mean(win) : 0.55;
+      p.f.s_cvflat = cv < 0.25 ? 1 : 0;
+      p.f.s_cvreg = cv >= 0.25 && cv < 0.4 ? 1 : 0;
+      p.f.s_cvvar = cv > 0.7 ? 1 : 0;
     });
-    const docReasons = [];
-    let docBias = 0;
-    const paraWords = {};
-    prose.forEach((s) => { paraWords[s.para] = (paraWords[s.para] || 0) + s.words; });
-    const paras = Object.values(paraWords).filter((n) => n > 15);
-    if (paras.length >= 3 && stdev(paras) / mean(paras) < 0.2) {
-      docBias += C.paraUniform; docReasons.push({ label: 'Párrafos de tamaño casi idéntico', weight: C.paraUniform });
+
+    // Whole-text features, shared by every sentence.
+    const share = (k) => (per.length ? mean(per.map((p) => (p.f[k] ? 1 : 0))) : 0);
+    const tokens = prose.map((s) => (s.text.toLowerCase().match(LEXWORD) || [])).flat();
+    const proseLetters = prose.reduce((n, s) => n + (s.text.match(/\p{L}/gu) || []).length, 0);
+    const D = {
+      d_cv: lens.length > 1 ? clamp(stdev(lens) / mean(lens), 0, 1.5) : 0.55,
+      d_meanlen: clamp(Math.log(Math.max(mean(lens), 1)) - Math.log(20), -2, 2),
+      d_lex: per.length ? mean(per.map((p) => p.f.s_lexai + p.f.s_lexhum)) : 0,
+      d_lexai: per.length ? mean(per.map((p) => p.f.s_lexai)) : 0,
+      d_mattr: tokens.length ? mattr(tokens, 50) - 0.7 : 0,
+      d_comma: clamp((prose.reduce((n, s) => n + (s.text.match(/,/g) || []).length, 0) / Math.max(proseWords, 1)) * 10, 0, 3),
+      d_names: per.length ? clamp(mean(per.map((p) => p.f.s_names)), 0, 4) : 0,
+      d_figure: per.length ? mean(per.map((p) => (p.f.s_figure || p.f.s_year || p.f.s_digits ? 1 : 0))) : 0,
+      d_question: share('s_question'),
+      d_first: share('s_first'),
+      d_informal: per.length ? mean(per.map((p) => (p.f.s_informal || p.f.s_filler ? 1 : 0))) : 0,
+      d_short: per.length ? mean(lens.map((n) => (n < 8 ? 1 : 0))) : 0,
+      d_long: per.length ? mean(lens.map((n) => (n > 35 ? 1 : 0))) : 0,
+      d_opener: share('s_opener'),
+      d_wlen: clamp(proseLetters / Math.max(proseWords, 1) - 5, -2, 3),
+      d_paren: share('s_paren'),
+      d_quote: share('s_quote'),
+      d_colon: share('s_colon'),
+    };
+    const fwCount = new Map();
+    tokens.forEach((t) => { const k = t.replace(/’/g, "'"); fwCount.set(k, (fwCount.get(k) || 0) + 1); });
+    const fwList = FW[lang] || FW.es;
+    for (let i = 0; i < FW_N; i++) {
+      D['d_fw_' + String(i).padStart(3, '0')] = i < fwList.length && tokens.length ? Math.sqrt((100 * (fwCount.get(fwList[i]) || 0)) / tokens.length) : 0;
     }
+    const stList = STARTS[lang] || STARTS.es;
+    const firsts = prose.map((s) => ((s.text.match(LEXWORD) || [''])[0] || '').toLowerCase());
+    for (let i = 0; i < ST_N; i++) {
+      D['d_st_' + String(i).padStart(2, '0')] = i < stList.length && firsts.length ? firsts.filter((w) => w === stList[i]).length / firsts.length : 0;
+    }
+    const proseText = prose.map((s) => s.text).join(' ');
+    PUNCT.forEach((re, i) => { D['d_pu_' + i] = clamp((100 * (proseText.match(re) || []).length) / Math.max(proseWords, 1), 0, 20); });
+    // Text-level logit. The model sees the mean of each sentence feature (m_*) and the whole-text features (d_*).
+    // Reasons compare the text with the average training text, so they say what this text has more of.
+    SFEATS.forEach((k) => { D['m_' + k] = per.length ? mean(per.map((p) => p.f[k])) : 0; });
+    let docX = docBias;
+    const byDoc = {};
+    Object.keys(DW).forEach((k) => {
+      const v = D[k] || 0;
+      docX += DW[k] * v;
+      const rel = DW[k] * (v - (DMU[k] || 0));
+      const label = labelFor(k.startsWith('m_') ? k.slice(2) : k);
+      if (label && rel > 0) byDoc[label] = (byDoc[label] || 0) + rel;
+    });
+    const docReasons = Object.entries(byDoc).filter(([, w]) => w >= 0.3).map(([label, weight]) => ({ label, weight }))
+      .sort((a, b) => b.weight - a.weight).slice(0, 5);
 
     const signals = {};
     const tally = (label) => { signals[label] = (signals[label] || 0) + 1; };
 
+    // Sentence-level logit from the sentence's own features. Only its distance from the text's mean counts, so a
+    // sentence rises or falls around the level the whole text sets.
     prose.forEach((s, i) => {
-      const t = s.text;
-      const words = s.words;
-      const reasons = [];
-      const hits = [];
-      let x = C.base + docBias;
-      const add = (label, w, detail) => { x += w; reasons.push({ label, weight: w, detail }); };
-
-      const phrases = collect(PHRASES, t, 'phrase', hits);
-      if (phrases.length) add('Frases hechas típicas de IA', Math.min(phrases.length, 3) * C.phrase, phrases.join(', '));
-      const buzz = collect(BUZZ, t, 'buzz', hits).filter((b) => !phrases.some((p) => p.toLowerCase().includes(b.toLowerCase())));
-      if (buzz.length) add('Palabras comodín', Math.min(buzz.length, 3) * C.buzz, buzz.join(', '));
-      const dashes = collect(DASH, t, 'dash', hits);
-      if (dashes.length) add('Rayas (—) como pausa', Math.min(dashes.length, 2) * C.dash);
-      if (OPENERS.test(t)) add('Empieza con conector formal', C.opener, t.match(OPENERS)[0]);
-      if (TRIAD.test(t)) add('Enumeración de tres elementos', C.triad, t.match(TRIAD)[0]);
-      if (NOT_X_BUT_Y.test(t)) add('Estructura «no es X, sino Y»', C.notXbutY);
-      if (/\*\*[^*]+\*\*/.test(t)) add('Negritas dentro del texto', C.bold);
-      if (burst[i]) add(burst[i].label, burst[i].weight);
-      if (words >= 14 && words <= 32) add('Longitud de frase típica de IA', C.typicalLength);
-      const letters = (t.match(/\p{L}/gu) || []).length;
-      if (words >= 6 && letters / words > 5.6) add('Vocabulario largo y formal', C.longVocab);
-
-      const informal = collect(INFORMAL_STRONG, t, 'human', hits).concat(collect(LAUGH, t, 'human', hits));
-      if (informal.length) add('Tono coloquial', C.informal * Math.min(informal.length, 2), informal.join(', '));
-      const weak = collect(INFORMAL_WEAK, t, 'human', hits);
-      if (weak.length) add('Muletillas de conversación', C.filler * Math.min(weak.length, 2), weak.join(', '));
-      if (/[!?]{2,}|\.{3}|…/.test(t)) add('Puntuación expresiva (!!, ...)', C.expressive);
-      if (/^[\p{Ll}]/u.test(t)) add('Empieza en minúscula', C.lowercase);
-      FIRST_PERSON.lastIndex = 0;
-      if (FIRST_PERSON.test(t)) add('Habla en primera persona', C.firstPerson);
-      FIRST_PERSON.lastIndex = 0;
-      if (words < 6) add('Frase muy corta', C.veryShort);
-      if (words > C.longWords) add('Frase muy larga y enredada', C.veryLong);
-      // Students and journalists chain clauses with commas; LLM prose keeps about one comma per clause.
-      // Commas that separate short list items ("clases, herencia, constructores") do not count.
-      const commas = t.split(',').slice(1).filter((seg) => (seg.match(WORD) || []).length > C.listItemWords).length;
-      if (C.commaDense && words >= 10 && commas / words >= C.commaRate) add('Muchas comas encadenadas', C.commaDense);
-      // Concrete names and figures: capitalised words mid-sentence, or exact figures (decimals, thousands,
-      // percentages). Bare years are left out because LLM histories are full of them.
-      const names = (t.slice(1).match(/(?<![.!?:«“"]\s)(?<=\s)\p{Lu}\p{Ll}+/gu) || []).length;
-      const figures = C.specificYears ? /\d[\d.,]{2,}/ : /\d[.,]\d|\d\s?%/;
-      if (C.specific && (names >= C.specificNames || figures.test(t))) add('Nombres o cifras concretas', C.specific);
-      // Typing slips LLMs never make: double spaces, a doubled word, a space before punctuation.
-      const gap = text.slice(Math.max(0, s.start - 3), s.start);
-      if (C.imperfect && (/ {2}/.test(gap) || /\S {2,}\S/.test(t) || /(?<![\p{L}])(\p{L}+) \1(?![\p{L}])/iu.test(t) || / [,.;:]/.test(t))) {
-        add('Erratas de tecleo', C.imperfect);
-      }
-
-      Object.assign(s, { x, reasons, hits });
+      const { f, hits, details } = per[i];
+      let x = 0;
+      const byLabel = {};
+      Object.keys(f).forEach((k) => {
+        const c = (SW[k] || 0) * f[k];
+        x += c;
+        if (Math.abs(alpha * c) < 0.1) return;
+        const label = LABELS[k];
+        const r = byLabel[label] || (byLabel[label] = { label, weight: 0, detail: undefined });
+        r.weight += alpha * c;
+        if (details[k]) r.detail = r.detail ? r.detail + ', ' + details[k] : details[k];
+      });
+      const reasons = Object.values(byLabel).filter((r) => Math.abs(r.weight) >= 0.1);
+      Object.assign(s, { sx: x, reasons, hits, f });
     });
+    const meanSx = mean(prose.map((s) => s.sx));
+    prose.forEach((s) => { s.dev = s.sx - meanSx; s.x = docX + alpha * s.dev; });
 
     // Turnitin scores each sentence "in context with the surrounding text" using overlapping
     // segments of a few sentences, so blend each sentence with its neighbours in the same paragraph.
     prose.forEach((s, i) => {
       const win = prose.slice(Math.max(0, i - C.context), i + C.context + 1).filter((o) => o.para === s.para);
-      const ctx = mean(win.map((o) => o.x));
-      s.p = sigmoid(C.ownWeight * s.x + (1 - C.ownWeight) * ctx);
-      s.own = sigmoid(s.x);
+      const ctx = mean(win.map((o) => o.dev));
+      // z is the score before the sigmoid. Near 0 or 1 probabilities saturate, so the humanizer compares z.
+      s.z = clamp(docX + alpha * (C.ownWeight * s.dev + (1 - C.ownWeight) * ctx), -30, 30);
+      s.p = sigmoid(s.z);
+      s.own = sigmoid(clamp(s.x, -30, 30));
       // In short texts nearly every sentence is an edge one, so the stricter bar only applies to longer texts.
       s.edge = prose.length >= C.edgeMinSentences && (i < C.edge || i >= prose.length - C.edge);
-      s.threshold = s.edge ? C.edgeThreshold : C.threshold;
+      s.threshold = Math.min(0.99, s.edge ? threshold + C.edgeExtra : threshold);
       s.ai = s.p >= s.threshold;
       if (s.ai) s.reasons.filter((r) => r.weight > 0).forEach((r) => tally(r.label));
     });
@@ -361,8 +525,9 @@
     const excludedBy = {};
     sentences.filter((s) => s.excluded).forEach((s) => { excludedBy[s.excluded] = (excludedBy[s.excluded] || 0) + 1; });
 
-    return {
+    const out = {
       text,
+      lang,
       tampering: { invisible: cleaned.invisible, lookalikes: cleaned.lookalikes },
       sentences,
       status,
@@ -375,13 +540,22 @@
       excludedBy,
       signals,
       docReasons,
+      docScore: docX,
       minWords: C.minWords,
     };
+    if (C.features) {
+      out.features = {
+        doc: FEATS.filter((k) => k[0] === 'd').map((k) => D[k]),
+        s: prose.map((s) => FEATS.filter((k) => k[0] === 's').map((k) => s.f[k])),
+        para: prose.map((s) => s.para),
+      };
+    }
+    return out;
   }
 
   // Same cleaning analyze() applies first, for the page to normalise pasted text.
   const tidy = (text) => tidyLayout((text || '').replace(INVISIBLE, '')).normalize('NFC');
-  const api = { analyze, segment, tidy, DEFAULTS };
+  const api = { analyze, segment, tidy, detectLang, DEFAULTS, FEATS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Polidetector = api;
 })(typeof window !== 'undefined' ? window : globalThis);

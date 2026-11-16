@@ -133,8 +133,10 @@
         return t;
       });
     // Flagged mostly because of its neighbours: own score below the bar, context pushes it over.
+    // Most of the score comes from the text as a whole, so say which whole-text traits weigh most.
     if (s.ai && doc && doc.docReasons && doc.docReasons.length) {
-      tips.push({ label: 'Párrafos de tamaño casi idéntico', tip: 'Todos los párrafos miden casi lo mismo. Alarga uno de ellos o acorta otro, aunque sea uniendo dos.', alts: [] });
+      const names = doc.docReasons.slice(0, 3).map((d) => d.label.charAt(0).toLowerCase() + d.label.slice(1));
+      tips.push({ label: 'Pesa el texto entero', tip: `Buena parte de la puntuación viene del texto en conjunto: ${names.join('; ')}. Cambiar frases sueltas ayuda poco si el resto sigue igual; varía también cómo empiezan las frases y las palabras que más repites.`, alts: [] });
     }
     if (s.ai && s.own < s.threshold) {
       tips.push({ label: 'Pesa el contexto', tip: 'Esta frase por sí sola no llega al umbral; la arrastran las de alrededor. Revisa también las frases vecinas marcadas.', alts: [] });
@@ -279,6 +281,7 @@
     const hit = r.sentences.filter((o) => !o.excluded && o.end > from && o.start < end);
     return {
       p: hit.length ? Math.max(...hit.map((o) => o.p)) : Infinity,
+      z: hit.length ? Math.max(...hit.map((o) => o.z)) : Infinity,
       ai: hit.some((o) => o.ai),
       frac: r.evaluatedSentences ? r.aiSentences / r.evaluatedSentences : 0,
       pct: r.percentAI,
@@ -292,8 +295,10 @@
     const limit = budget || 500;
     let evals = 0;
     const score = (cand) => { evals++; return scoreCandidate(text, s.start, s.end, cand); };
-    const start = { p: s.p, ai: s.ai, frac: base.evaluatedSentences ? base.aiSentences / base.evaluatedSentences : 0, pct: base.percentAI };
-    const ok = (a, b) => a.frac <= b.frac + 1e-9 && a.p < b.p - 0.005;
+    const start = { p: s.p, z: s.z, ai: s.ai, frac: base.evaluatedSentences ? base.aiSentences / base.evaluatedSentences : 0, pct: base.percentAI };
+    // Compared on z, the score before the sigmoid: when the whole text scores high, p saturates near 1 and real
+    // improvements to the sentence would look like nothing.
+    const ok = (a, b) => a.frac <= b.frac + 1e-9 && a.z < b.z - 0.02;
     const valid = (c, from) => c && c !== from && wc(c) >= 3;
     let cur = Object.assign({ text: s.text }, start);
     for (let pass = 0; pass < 3 && cur.ai; pass++) {
@@ -316,7 +321,7 @@
           const c2 = tidy(e2(c1));
           if (!valid(c2, c1)) continue;
           const sc = score(c2);
-          if (isFinite(sc.p) && !sc.ai && sc.frac <= start.frac + 1e-9) { cur = Object.assign({ text: c2 }, sc); break search; }
+          if (isFinite(sc.z) && !sc.ai && sc.frac <= start.frac + 1e-9) { cur = Object.assign({ text: c2 }, sc); break search; }
         }
       }
     }
@@ -332,7 +337,7 @@
         const from = after ? s.start : n.start;
         const to = after ? n.end : s.end;
         const sc = scoreCandidate(text, from, to, joined);
-        if (isFinite(sc.p) && !sc.ai && sc.frac <= start.frac + 1e-9) {
+        if (isFinite(sc.z) && !sc.ai && sc.frac <= start.frac + 1e-9) {
           cur = Object.assign({ text: joined }, sc);
           span = { start: from, end: to, merged: true };
           break;
@@ -362,7 +367,7 @@
       const res = propose(cur, base, s);
       // A join must not swallow a sentence that was already rewritten.
       const swallows = res.merged && changes.some((c) => c.start >= res.start && c.start < res.end);
-      if (res.changed && !swallows && (res.solved || res.before.p - res.after.p >= 0.05)) {
+      if (res.changed && !swallows && (res.solved || res.before.z - res.after.z >= 0.3)) {
         const before = cur.slice(res.start, res.end);
         cur = cur.slice(0, res.start) + res.text + cur.slice(res.end);
         const delta = res.text.length - before.length;

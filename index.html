@@ -116,18 +116,18 @@
               <p>Polidetector aplica las reglas que Turnitin publica en su centro de ayuda sobre su detector de IA:</p>
               <ul>
                 <li>Solo evalúa frases de prosa. Las listas, títulos, referencias, tablas, fórmulas y código se quitan y no cuentan en el porcentaje. Polidetector quita además las líneas de diálogo, porque con sus reglas no se puede distinguir un diálogo humano de uno escrito por IA.</li>
-                <li>Cada frase recibe una puntuación entre 0 y 1 teniendo en cuenta las frases de alrededor. Si supera el umbral es IA y si no, humana.</li>
+                <li>Cada frase recibe una puntuación entre 0 y 1 que combina el texto entero con la propia frase y sus vecinas. Si supera el umbral es IA y si no, humana.</li>
                 <li>El porcentaje es la proporción de frases evaluadas que salen como IA, no del texto entero.</li>
                 <li>Hacen falta al menos 300 palabras de prosa y como mucho 30.000.</li>
                 <li>Entre el 1 % y el 19 % se muestra «*%», sin cifra ni subrayados, porque ahí los falsos positivos son más probables.</li>
-                <li>El resultado se resume en tres bandas provisionales: sin conclusión (menos del 40 %), dudoso (del 40 % al 59 %) e indicio fuerte (60 % o más). Estas bandas no son de Turnitin. Un resultado bajo no demuestra que el texto sea humano.</li>
+                <li>El resultado se resume en tres bandas: sin conclusión (menos del 40 %), dudoso (del 40 % al 59 %) e indicio fuerte (60 % o más). Estas bandas no son de Turnitin. El umbral está puesto para que casi ningún texto humano llegue al 40 %, aunque eso deje pasar parte de la IA, así que un resultado bajo no demuestra que el texto sea humano.</li>
                 <li>Al tocar una frase marcada verás consejos para reescribirla, alternativas a las expresiones típicas de IA y un ejemplo reescrito con esas mismas reglas. El ejemplo es un borrador: las reglas no entienden el sentido de la frase, así que revísalo antes de usarlo. Que baje aquí la puntuación no garantiza que baje en Turnitin ni en otros detectores.</li>
                 <li>«Humanizar todo» aplica ese mismo ejemplo a cada frase marcada, y solo a esas: quita muletillas y adverbios, parte frases largas o une dos marcadas. Solo se queda con un cambio si no sube el porcentaje de IA del texto. Siempre puedes volver atrás con «Deshacer cambio».</li>
                 <li>Al pegar desde Word, Google Docs o un PDF se limpian las sangrías, los espacios y saltos de línea raros y las líneas cortadas por el ancho de página, para que no se tomen por tablas ni se dejen sin evaluar.</li>
                 <li>Las primeras y últimas frases necesitan una puntuación más alta, porque las introducciones y conclusiones genéricas dan más falsos positivos. En textos de menos de 10 frases no se aplica, porque casi todas serían de principio o final.</li>
               </ul>
-              <p>Lo que no se puede copiar es el modelo de Turnitin, que es privado. Aquí la puntuación de cada frase sale de rasgos de estilo: a favor de IA, frases hechas, palabras comodín y frases de longitud muy regular; a favor de humano, tono coloquial, primera persona, frases largas con muchas comas, nombres y cifras exactas y erratas de tecleo. Antes de analizar se quitan los caracteres invisibles y las letras de otros alfabetos camufladas, un truco habitual para engañar a los detectores.</p>
-              <p>Ningún detector es infalible, tampoco los comerciales: la IA bien escrita o retocada puede pasar como humana, y algunos textos humanos muy formales pueden parecer IA. Toma el resultado como un indicio, nunca como una prueba, y puede no coincidir con el que te daría Turnitin. Polidetector no es un producto de Turnitin ni está relacionado con él. Tu texto no sale del navegador.</p>
+              <p>Lo que no se puede copiar es el modelo de Turnitin, que es privado. Aquí la puntuación sale de un modelo estadístico pequeño, uno para español y otro para inglés, entrenado con unos 6.000 textos públicos de IA de una treintena de modelos (entre ellos GPT-4o, GPT-5 mini, Gemini, DeepSeek, Qwen, Claude, Llama y Mistral) y unos 6.000 textos humanos escritos antes de que hubiera IA generativa al alcance de todos. Se fija en rasgos de estilo: las palabras que la IA usa de más, la proporción de palabras gramaticales, cómo empiezan las frases, la variedad del vocabulario, el ritmo de longitudes, la puntuación, el tono coloquial y las erratas. Antes de analizar se quitan los caracteres invisibles y las letras de otros alfabetos camufladas, un truco habitual para engañar a los detectores.</p>
+              <p>En una prueba con textos que no se usaron para ajustarlo, llegaron al 40 % el 0,3 % de los textos humanos en español y el 0,2 % en inglés, y lo hicieron el 85 % de los textos de IA en español y el 44 % en inglés. Con textos de un tipo que no había visto nunca, esos errores con textos humanos rondaron el 1 % y detectó menos IA. Ningún detector es infalible, tampoco los comerciales: la IA bien escrita o retocada puede pasar como humana, y algunos textos humanos muy formales pueden parecer IA. Toma el resultado como un indicio, nunca como una prueba, y puede no coincidir con el que te daría Turnitin. Polidetector no es un producto de Turnitin ni está relacionado con él. Tu texto no sale del navegador.</p>
             </details>
       </aside>
     </div>
@@ -141,8 +141,9 @@
   </div>
 </div>
 
-<script src="detector.js?v=15"></script>
-<script src="sugerencias.js?v=5"></script>
+<script src="modelo.js?v=1"></script>
+<script src="detector.js?v=16"></script>
+<script src="sugerencias.js?v=6"></script>
 <script src="app.js?v=22"></script>
 </body>
 </html>
